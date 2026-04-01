@@ -250,6 +250,7 @@ CFG
         env:
           OHPM_PRIVATE_KEY_PEM: ${{ secrets.OHPM_PRIVATE_KEY_PEM }}
           OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
+          OHPM_AUTH_TOKEN: ${{ secrets.OHPM_AUTH_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -271,6 +272,9 @@ CFG
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
           ohpm config set publish_registry "${OHPM_REGISTRY}"
+          if [[ -n "${OHPM_AUTH_TOKEN:-}" ]]; then
+            ohpm config set "//ohpm.openharmony.cn/ohpm/:_auth" "${OHPM_AUTH_TOKEN}"
+          fi
 
       - name: Publish HAR to OHPM
         if: ${{ !inputs.dry_run }}
