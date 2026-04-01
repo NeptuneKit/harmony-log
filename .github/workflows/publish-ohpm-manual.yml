@@ -175,7 +175,9 @@ jobs:
           if [[ "${ohpm_status}" -ne 0 ]]; then
             exit "${ohpm_status}"
           fi
-          if grep -Eq 'ohpm ERROR| ERROR:' "${publish_log}"; then
+          clean_log="$(mktemp)"
+          sed -E 's/\x1B\[[0-9;?]*[ -/]*[@-~]//g' "${publish_log}" > "${clean_log}"
+          if grep -Eq 'ohpm ERROR| ERROR:' "${clean_log}"; then
             echo "Detected ohpm error output in publish log." >&2
             exit 1
           fi

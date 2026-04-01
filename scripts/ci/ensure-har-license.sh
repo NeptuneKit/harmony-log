@@ -8,6 +8,9 @@ fi
 
 har_path="$1"
 license_path="$2"
+repo_root="$(cd "$(dirname "${har_path}")/.." && pwd)"
+readme_src="${repo_root}/README.md"
+changelog_src="${repo_root}/CHANGELOG.md"
 
 if [[ ! -f "${har_path}" ]]; then
   echo "HAR file not found: ${har_path}" >&2
@@ -25,10 +28,25 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 tar -xzf "${har_path}" -C "${tmp_dir}"
 mkdir -p "${tmp_dir}/package"
 cp -f "${license_path}" "${tmp_dir}/package/LICENSE"
+if [[ -f "${readme_src}" ]]; then
+  cp -f "${readme_src}" "${tmp_dir}/package/readme.md"
+fi
+if [[ -f "${changelog_src}" ]]; then
+  cp -f "${changelog_src}" "${tmp_dir}/package/changelog.md"
+else
+  cat > "${tmp_dir}/package/changelog.md" <<'MD'
+# Changelog
+
+## 1.0.0
+
+- Initial release.
+MD
+fi
+find "${tmp_dir}/package" -name '._*' -delete
 
 (
   cd "${tmp_dir}"
   tar -czf "${har_path}" package
 )
 
-echo "Injected LICENSE into ${har_path}"
+echo "Injected LICENSE/readme/changelog into ${har_path}"
