@@ -16,10 +16,7 @@ cat > "${tmp_proj}/oh-package.json5" <<'JSON'
   "modelVersion": "5.0.0",
   "description": "Project shell for building harmony-log HAR module.",
   "dependencies": {},
-  "devDependencies": {
-    "@ohos/hvigor": "^5.0.0",
-    "@ohos/hvigor-ohos-plugin": "^5.0.0"
-  }
+  "devDependencies": {}
 }
 JSON
 
@@ -159,14 +156,16 @@ for candidate in "${fixed_candidates[@]}"; do
   fi
 done
 
-while IFS= read -r candidate; do
-  if [[ "${candidate}" == *"/hvigor.js" && -f "${candidate}" ]]; then
-    discovered_node_script="${candidate}"
-  fi
-  if [[ -z "${discovered_bin}" && -f "${candidate}" && -x "${candidate}" ]]; then
-    discovered_bin="${candidate}"
-  fi
-done < <(find "${HOME}" "${tmp_proj}" -maxdepth 14 -type f \( -name "hvigor" -o -name "hvigorw" -o -name "hvigor.js" \) 2>/dev/null | sort -u)
+if [[ -z "${discovered_bin}" ]]; then
+  while IFS= read -r candidate; do
+    if [[ "${candidate}" == *"/hvigor.js" && -f "${candidate}" ]]; then
+      discovered_node_script="${candidate}"
+    fi
+    if [[ -z "${discovered_bin}" && -f "${candidate}" && -x "${candidate}" ]]; then
+      discovered_bin="${candidate}"
+    fi
+  done < <(find "${HOME}" "${tmp_proj}" -maxdepth 14 -type f \( -name "hvigor" -o -name "hvigorw" -o -name "hvigor.js" \) 2>/dev/null | sort -u)
+fi
 
 if [[ -n "${HVIGOR_BIN:-}" && -x "${HVIGOR_BIN}" ]]; then
   "${HVIGOR_BIN}" --mode module -p module=harmony_log assembleHar --no-daemon
