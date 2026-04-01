@@ -155,15 +155,16 @@ jobs:
           cd "${har_dir}"
           publish_log="$(mktemp)"
           ohpm_status=0
+          publish_cmd="ohpm publish \"${har_name}\" --publish_registry \"${OHPM_REGISTRY}\""
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
-            printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}" 2>&1 | tee "${publish_log}"
+            printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | script -q -e -c "${publish_cmd}" /dev/null 2>&1 | tee "${publish_log}"
             ohpm_status=${PIPESTATUS[1]}
             set -e
           else
             set +e
-            printf 'y\n' | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}" 2>&1 | tee "${publish_log}"
+            printf 'y\n' | script -q -e -c "${publish_cmd}" /dev/null 2>&1 | tee "${publish_log}"
             ohpm_status=${PIPESTATUS[1]}
             set -e
           fi
