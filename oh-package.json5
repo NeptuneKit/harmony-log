@@ -1,0 +1,11 @@
+{
+  "name": "harmony-log",
+  "version": "1.0.0",
+  "description": "Swift-log style logger for HarmonyOS.",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {},
+  "devDependencies": {},
+  "dynamicDependencies": {}
+}
