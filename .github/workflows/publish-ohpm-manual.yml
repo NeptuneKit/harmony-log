@@ -129,6 +129,7 @@ jobs:
           key_path="${HOME}/.ohpm/publish_key.pem"
           printf '%s\n' "${OHPM_PRIVATE_KEY_PEM}" > "${key_path}"
           chmod 600 "${key_path}"
+          echo "OHPM_KEY_PATH=${key_path}" >> "${GITHUB_ENV}"
           ohpm config set key_path "${key_path}"
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
@@ -138,6 +139,7 @@ jobs:
         shell: bash
         env:
           OHPM_KEY_PASSPHRASE: ${{ secrets.OHPM_KEY_PASSPHRASE }}
+          OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
         run: |
           set -euo pipefail
           har_file="${HAR_FILE_PATH:-}"
@@ -148,8 +150,9 @@ jobs:
           har_dir="$(dirname "${har_file}")"
           har_name="$(basename "${har_file}")"
           cd "${har_dir}"
+          publish_args=(--publish_registry "${OHPM_REGISTRY}" --publish_id "${OHPM_PUBLISH_ID}" --key_path "${OHPM_KEY_PATH}")
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
-            printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}"
+            printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_name}" "${publish_args[@]}"
           else
-            ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}"
+            ohpm publish "${har_name}" "${publish_args[@]}"
           fi
