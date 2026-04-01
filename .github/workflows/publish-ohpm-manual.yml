@@ -135,7 +135,7 @@ jobs:
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
           if [[ -n "${OHPM_TOKEN:-}" ]]; then
-            ohpm config set //ohpm.openharmony.cn/ohpm/:_auth "${OHPM_TOKEN}"
+            printf '\n//ohpm.openharmony.cn/ohpm/:_auth="%s"\n' "${OHPM_TOKEN}" >> "${HOME}/.ohpm/.ohpmrc"
           fi
 
       - name: Publish HAR to OHPM
