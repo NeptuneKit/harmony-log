@@ -47,7 +47,8 @@ jobs:
       version: ${{ needs.resolve-version.outputs.version_name }}
       dry_run: ${{ inputs.dry_run }}
       build_command: |
-        HAR_PATH="$(bash scripts/ci/build-temp-har.sh "${{ needs.resolve-version.outputs.version_name }}")"
+        HAR_PATH="$(bash scripts/ci/build-temp-har.sh "${{ needs.resolve-version.outputs.version_name }}" | tail -n 1)"
+        test -n "${HAR_PATH}" && test -f "${HAR_PATH}"
         mkdir -p dist
         cp -f "${HAR_PATH}" dist/harmony_log.har
       har_path: dist/harmony_log.har
