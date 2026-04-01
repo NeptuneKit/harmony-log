@@ -162,7 +162,7 @@ jobs:
           fi
           publish_log="$(mktemp)"
           ohpm_status=0
-          publish_cmd="ohpm publish \"${publish_har}\" --publish_registry \"${OHPM_REGISTRY}\""
+          publish_cmd="NODE_OPTIONS=--trace-uncaught ohpm publish \"${publish_har}\" --publish_registry \"${OHPM_REGISTRY}\""
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
