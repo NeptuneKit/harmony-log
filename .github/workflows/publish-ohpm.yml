@@ -277,21 +277,26 @@ CFG
           OHPM_PRIVATE_KEY_PEM: ${{ secrets.OHPM_PRIVATE_KEY_PEM }}
           OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
           OHPM_AUTH_TOKEN: ${{ secrets.OHPM_AUTH_TOKEN }}
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           set -euo pipefail
 
-          if [[ -z "${OHPM_PRIVATE_KEY_PEM}" ]]; then
-            echo "OHPM_PRIVATE_KEY_PEM is required for publish." >&2
-            exit 1
-          fi
           if [[ -z "${OHPM_PUBLISH_ID}" ]]; then
             echo "OHPM_PUBLISH_ID is required for publish." >&2
             exit 1
           fi
 
           mkdir -p "${HOME}/.ohpm"
-          key_path="${HOME}/.ohpm/publish_key.pem"
-          printf '%s\n' "${OHPM_PRIVATE_KEY_PEM}" > "${key_path}"
+          if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" && -f "${HOME}/.ohpm/keys/ohpm_rsa_20260401" ]]; then
+            key_path="${HOME}/.ohpm/keys/ohpm_rsa_20260401"
+          else
+            if [[ -z "${OHPM_PRIVATE_KEY_PEM}" ]]; then
+              echo "OHPM_PRIVATE_KEY_PEM is required for publish." >&2
+              exit 1
+            fi
+            key_path="${HOME}/.ohpm/publish_key.pem"
+            printf '%s\n' "${OHPM_PRIVATE_KEY_PEM}" > "${key_path}"
+          fi
           chmod 600 "${key_path}"
 
           ohpm config set key_path "${key_path}"
