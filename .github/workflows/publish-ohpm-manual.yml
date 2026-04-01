@@ -156,14 +156,15 @@ jobs:
           publish_log="$(mktemp)"
           ohpm_status=0
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
+            # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
-            printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}" 2>&1 | tee "${publish_log}"
+            printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}" 2>&1 | tee "${publish_log}"
             ohpm_status=${PIPESTATUS[1]}
             set -e
           else
             set +e
-            ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}" 2>&1 | tee "${publish_log}"
-            ohpm_status=${PIPESTATUS[0]}
+            printf 'y\n' | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}" 2>&1 | tee "${publish_log}"
+            ohpm_status=${PIPESTATUS[1]}
             set -e
           fi
           if [[ "${ohpm_status}" -ne 0 ]]; then
