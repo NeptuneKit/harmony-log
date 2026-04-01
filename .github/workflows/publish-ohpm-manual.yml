@@ -151,27 +151,7 @@ jobs:
             exit 1
           fi
           publish_har="${har_file}"
-          canonical_har_name="$(python3 - "${har_file}" <<'PY'
-import json
-import tarfile
-import sys
-
-har_path = sys.argv[1]
-try:
-    with tarfile.open(har_path, "r:gz") as tf:
-        member = tf.extractfile("package/oh-package.json5")
-        if member is None:
-            raise RuntimeError("missing package/oh-package.json5")
-        manifest = json.loads(member.read().decode("utf-8"))
-    name = manifest.get("name")
-    version = manifest.get("version")
-    if not name or not version:
-        raise RuntimeError("missing name/version")
-    print(f"{name}-{version}.har")
-except Exception:
-    print("")
-PY
-)"
+          canonical_har_name="$(python3 scripts/ci/har-canonical-name.py "${har_file}")"
           if [[ -n "${canonical_har_name}" ]]; then
             canonical_har_path="$(dirname "${har_file}")/${canonical_har_name}"
             if [[ "$(basename "${har_file}")" != "${canonical_har_name}" ]]; then
