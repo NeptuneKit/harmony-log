@@ -12,9 +12,6 @@ name: Publish To OHPM (Manual)
         required: false
         default: false
         type: boolean
-  repository_dispatch:
-    types:
-      - publish-ohpm
 
 permissions:
   contents: read
@@ -22,7 +19,6 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-
     env:
       OHPM_REGISTRY: https://ohpm.openharmony.cn/ohpm/
 
@@ -32,23 +28,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          version_input="${{ inputs.version || github.event.client_payload.version || '' }}"
-          dry_run_input="${{ inputs.dry_run || github.event.client_payload.dry_run || false }}"
-          if [[ "${dry_run_input}" == "true" ]]; then
-            echo "DRY_RUN=true" >> "${GITHUB_ENV}"
-          else
-            echo "DRY_RUN=false" >> "${GITHUB_ENV}"
-          fi
-
-          version_name="${version_input}"
+          version_name="${{ inputs.version }}"
           version_name="${version_name#v}"
-
           if [[ ! "${version_name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]] && [[ ! "${version_name}" =~ ^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]+)?$ ]]; then
             echo "invalid version: ${version_name}" >&2
             exit 1
           fi
-
           printf 'version_name=%s\n' "${version_name}" >> "${GITHUB_OUTPUT}"
 
       - name: Checkout
@@ -69,23 +54,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           release_json="$(curl -sSL -H 'Accept: application/vnd.github+json' https://api.github.com/repos/harmonyos-dev/hos-sdk/releases/latest)"
           asset_url="$(printf '%s' "${release_json}" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((a.get("browser_download_url", "") for a in data.get("assets", []) if a.get("name", "").startswith("commandline-tools-linux-") and a.get("name", "").endswith(".zip")), ""))')"
           if [[ -z "${asset_url}" || "${asset_url}" == "null" ]]; then
             echo "Cannot resolve Harmony command line tools download url." >&2
             exit 1
           fi
-
           curl -sSL -o commandline-tools.zip "${asset_url}"
           unzip -q commandline-tools.zip
           mkdir -p "${HOME}/harmonyOS-command-line-tools"
           cp -R command-line-tools/* "${HOME}/harmonyOS-command-line-tools/"
-
           echo "${HOME}/harmonyOS-command-line-tools/bin" >> "${GITHUB_PATH}"
           echo "${HOME}/harmonyOS-command-line-tools/hvigor/bin" >> "${GITHUB_PATH}"
           echo "${HOME}/harmonyOS-command-line-tools/node_modules/.bin" >> "${GITHUB_PATH}"
-
           export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Duser.country=CN"
           chmod +x "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr"
           "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr" install toolchains:9 OpenHarmony/toolchains:9 --accept-license
@@ -94,153 +75,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          version_name="${{ steps.version.outputs.version_name }}"
-          tmp_proj="${RUNNER_TEMP}/harmony-log-ohpm-publish"
-          rm -rf "${tmp_proj}"
-          mkdir -p "${tmp_proj}/hvigor" "${tmp_proj}/library/src/main/ets" "${tmp_proj}/library/src/main" "${tmp_proj}/AppScope"
-
-          cat > "${tmp_proj}/oh-package.json5" <<'JSON'
-          {
-            "modelVersion": "5.0.0",
-            "description": "Project shell for building harmony-log HAR module.",
-            "dependencies": {},
-            "devDependencies": {}
-          }
-JSON
-
-          cat > "${tmp_proj}/hvigor/hvigor-config.json5" <<'JSON'
-          {
-            "modelVersion": "5.0.0",
-            "dependencies": {},
-            "execution": {},
-            "logging": {},
-            "debugging": {},
-            "nodeOptions": {}
-          }
-JSON
-
-          cat > "${tmp_proj}/hvigorfile.ts" <<'TS'
-          import { appTasks } from '@ohos/hvigor-ohos-plugin'
-
-          export default {
-            system: appTasks,
-            plugins: []
-          }
-TS
-
-          cat > "${tmp_proj}/build-profile.json5" <<'JSON'
-          {
-            "app": {
-              "products": [
-                {
-                  "name": "default",
-                  "compatibleSdkVersion": "5.0.0(12)",
-                  "targetSdkVersion": "5.0.0(12)",
-                  "runtimeOS": "HarmonyOS",
-                  "buildOption": {
-                    "strictMode": {
-                      "useNormalizedOHMUrl": true
-                    }
-                  }
-                }
-              ],
-              "buildModeSet": [
-                {
-                  "name": "release"
-                }
-              ]
-            },
-            "modules": [
-              {
-                "name": "harmony_log",
-                "srcPath": "./library"
-              }
-            ]
-          }
-JSON
-
-          cat > "${tmp_proj}/AppScope/app.json5" <<JSON
-          {
-            "app": {
-              "bundleName": "io.github.neptunekit.harmony.log",
-              "vendor": "NeptuneKit",
-              "versionCode": 1,
-              "versionName": "${version_name}"
-            }
-          }
-JSON
-
-          cat > "${tmp_proj}/library/hvigorfile.ts" <<'TS'
-          import { harTasks } from '@ohos/hvigor-ohos-plugin'
-
-          export default {
-            system: harTasks,
-            plugins: []
-          }
-TS
-
-          cat > "${tmp_proj}/library/build-profile.json5" <<'JSON'
-          {
-            "apiType": "stageMode",
-            "targets": [
-              {
-                "name": "default"
-              }
-            ]
-          }
-JSON
-
-          cat > "${tmp_proj}/library/oh-package.json5" <<JSON
-          {
-            "name": "harmony-log",
-            "version": "${version_name}",
-            "description": "Swift-log style logger for HarmonyOS.",
-            "main": "Index.ets",
-            "author": "NeptuneKit",
-            "license": "MIT",
-            "compatibleSdkVersion": 12,
-            "dependencies": {},
-            "devDependencies": {},
-            "dynamicDependencies": {}
-          }
-JSON
-
-          cat > "${tmp_proj}/library/Index.ets" <<'TS'
-          export * from './src/main/ets/HarmonyLog'
-TS
-
-          cp src/main/ets/HarmonyLog.ets "${tmp_proj}/library/src/main/ets/HarmonyLog.ets"
-          cp src/main/ets/HarmonyLogCore.ets "${tmp_proj}/library/src/main/ets/HarmonyLogCore.ets"
-          cp src/main/module.json5 "${tmp_proj}/library/src/main/module.json5"
-
-          cat > "${tmp_proj}/.ohpmrc" <<'CFG'
-          registry=https://ohpm.openharmony.cn/ohpm/
-          publish_registry=https://ohpm.openharmony.cn/ohpm/
-          strict_ssl=true
-CFG
-
-          cd "${tmp_proj}"
-          ohpm install
-          hvigorw --mode module -p module=harmony_log assembleHar --no-daemon
-
-          har_path="$(find "${tmp_proj}/library/build" -type f -name '*.har' | head -n 1)"
-          if [[ -z "${har_path}" || ! -f "${har_path}" ]]; then
-            echo "No .har artifact found." >&2
-            exit 1
-          fi
-
-          echo "HAR_FILE_PATH=${har_path}" >> "${GITHUB_ENV}"
+          bash scripts/ci/build-temp-har.sh "${{ steps.version.outputs.version_name }}"
 
       - name: Configure OHPM publish credentials
-        if: ${{ env.DRY_RUN != 'true' }}
+        if: ${{ !inputs.dry_run }}
         shell: bash
         env:
           OHPM_PRIVATE_KEY_PEM: ${{ secrets.OHPM_PRIVATE_KEY_PEM }}
           OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
         run: |
           set -euo pipefail
-
           if [[ -z "${OHPM_PRIVATE_KEY_PEM}" ]]; then
             echo "OHPM_PRIVATE_KEY_PEM is required for publish." >&2
             exit 1
@@ -249,30 +93,26 @@ CFG
             echo "OHPM_PUBLISH_ID is required for publish." >&2
             exit 1
           fi
-
           mkdir -p "${HOME}/.ohpm"
           key_path="${HOME}/.ohpm/publish_key.pem"
           printf '%s\n' "${OHPM_PRIVATE_KEY_PEM}" > "${key_path}"
           chmod 600 "${key_path}"
-
           ohpm config set key_path "${key_path}"
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
 
       - name: Publish HAR to OHPM
-        if: ${{ env.DRY_RUN != 'true' }}
+        if: ${{ !inputs.dry_run }}
         shell: bash
         env:
           OHPM_KEY_PASSPHRASE: ${{ secrets.OHPM_KEY_PASSPHRASE }}
         run: |
           set -euo pipefail
-
           har_file="${HAR_FILE_PATH:-}"
           if [[ -z "${har_file}" || ! -f "${har_file}" ]]; then
             echo "HAR_FILE_PATH is missing or invalid." >&2
             exit 1
           fi
-
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             if command -v script >/dev/null 2>&1; then
               printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | script -q -e -c "ohpm publish \"${har_file}\" --publish_registry \"${OHPM_REGISTRY}\"" /dev/null
