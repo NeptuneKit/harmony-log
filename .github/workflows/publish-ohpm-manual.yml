@@ -147,6 +147,7 @@ jobs:
             echo "HAR_FILE_PATH is missing or invalid." >&2
             exit 1
           fi
+          bash scripts/ci/ensure-har-license.sh "${har_file}" "${GITHUB_WORKSPACE}/LICENSE"
           publish_har="${har_file}"
           canonical_har_name="$(python3 scripts/ci/har-canonical-name.py "${har_file}")"
           if [[ -n "${canonical_har_name}" ]]; then
