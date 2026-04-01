@@ -219,7 +219,7 @@ jobs:
             # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
             if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
-              printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
+              printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
             else
               printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
             fi
@@ -228,7 +228,7 @@ jobs:
           else
             set +e
             if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
-              printf 'y\n' | bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
+              printf '\n' | bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
             else
               printf 'y\n' | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
             fi
