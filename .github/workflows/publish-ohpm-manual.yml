@@ -13,20 +13,19 @@ on:
         default: false
         type: boolean
       force_rebuild_har:
-        description: "Ignore dist/harmony_log.har and rebuild in CI"
+        description: "Reserved option, current org workflow always rebuilds"
         required: false
-        default: false
+        default: true
         type: boolean
 
 permissions:
   contents: read
 
 jobs:
-  publish:
+  resolve-version:
     runs-on: [self-hosted, macOS, ARM64]
-    env:
-      OHPM_REGISTRY: https://ohpm.openharmony.cn/ohpm/
-
+    outputs:
+      version_name: ${{ steps.version.outputs.version_name }}
     steps:
       - name: Resolve package version
         id: version
@@ -41,213 +40,16 @@ jobs:
           fi
           printf 'version_name=%s\n' "${version_name}" >> "${GITHUB_OUTPUT}"
 
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Prepare self-hosted toolchain
-        if: ${{ runner.environment == 'self-hosted' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          toolkit_root="${HOME}/harmonyOS-command-line-tools"
-          if [[ ! -d "${toolkit_root}" ]]; then
-            echo "Missing toolkit at ${toolkit_root}" >&2
-            exit 1
-          fi
-          chmod +x "${toolkit_root}/bin/ohpm" 2>/dev/null || true
-          chmod +x "${toolkit_root}/bin/hvigorw" 2>/dev/null || true
-          chmod +x "${toolkit_root}/hvigor/bin/hvigorw" 2>/dev/null || true
-          echo "JAVA_HOME=${HOME}/Java/temurin-17.jdk/Contents/Home" >> "${GITHUB_ENV}"
-          echo "DEVECO_SDK_HOME=${toolkit_root}/sdk" >> "${GITHUB_ENV}"
-          echo "HOS_SDK_HOME=${toolkit_root}/sdk/default/openharmony" >> "${GITHUB_ENV}"
-          echo "${HOME}/Java/temurin-17.jdk/Contents/Home/bin" >> "${GITHUB_PATH}"
-          echo "${toolkit_root}/bin" >> "${GITHUB_PATH}"
-          echo "${toolkit_root}/tool/node/bin" >> "${GITHUB_PATH}"
-          echo "${toolkit_root}/hvigor/bin" >> "${GITHUB_PATH}"
-          echo "${toolkit_root}/node_modules/.bin" >> "${GITHUB_PATH}"
-          echo "${toolkit_root}/sdk/default/openharmony/toolchains" >> "${GITHUB_PATH}"
-
-      - name: Set up Java 17
-        if: ${{ runner.environment != 'self-hosted' }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Set up Node.js
-        if: ${{ runner.environment != 'self-hosted' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Harmony command line tools
-        if: ${{ runner.environment != 'self-hosted' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_json="$(curl -sSL -H 'Accept: application/vnd.github+json' https://api.github.com/repos/harmonyos-dev/hos-sdk/releases/latest)"
-          tools_platform="$(echo "${RUNNER_OS:-Linux}" | tr '[:upper:]' '[:lower:]')"
-          case "${tools_platform}" in
-            macos) tools_platform="mac" ;;
-            linux) tools_platform="linux" ;;
-            *) tools_platform="linux" ;;
-          esac
-          asset_url="$(printf '%s' "${release_json}" | python3 -c "import json,sys; platform='${tools_platform}'; data=json.load(sys.stdin); print(next((a.get('browser_download_url', '') for a in data.get('assets', []) if a.get('name', '').startswith(f'commandline-tools-{platform}-') and a.get('name', '').endswith('.zip')), ''))")"
-          if [[ -z "${asset_url}" || "${asset_url}" == "null" ]]; then
-            if [[ "${tools_platform}" == "mac" ]]; then
-              asset_url="https://github.com/harmonyos-dev/hos-sdk/releases/download/v2.0.2/commandline-tools-mac-2.0.0.2.zip"
-            else
-              asset_url="https://github.com/harmonyos-dev/hos-sdk/releases/download/v2.0.2/commandline-tools-linux-2.0.0.2.zip"
-            fi
-          fi
-          curl -sSL -o commandline-tools.zip "${asset_url}"
-          unzip -q commandline-tools.zip
-          mkdir -p "${HOME}/harmonyOS-command-line-tools"
-          cp -R command-line-tools/* "${HOME}/harmonyOS-command-line-tools/"
-          echo "${HOME}/harmonyOS-command-line-tools/bin" >> "${GITHUB_PATH}"
-          echo "${HOME}/harmonyOS-command-line-tools/hvigor/bin" >> "${GITHUB_PATH}"
-          echo "${HOME}/harmonyOS-command-line-tools/node_modules/.bin" >> "${GITHUB_PATH}"
-          export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Duser.country=CN"
-          chmod +x "${HOME}/harmonyOS-command-line-tools/bin/hvigorw" 2>/dev/null || true
-          chmod +x "${HOME}/harmonyOS-command-line-tools/hvigor/bin/hvigorw" 2>/dev/null || true
-          chmod +x "${HOME}/harmonyOS-command-line-tools/hvigor/bin/hvigor" 2>/dev/null || true
-          chmod +x "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr"
-          "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr" install toolchains:9 OpenHarmony/toolchains:9 --accept-license
-          hvigorw_bin="$(find "${HOME}/harmonyOS-command-line-tools" -type f -name hvigorw | head -n1 || true)"
-          hvigor_bin="$(find "${HOME}/harmonyOS-command-line-tools" -type f -name hvigor | head -n1 || true)"
-          if [[ -n "${hvigorw_bin}" ]]; then
-            echo "HVIGORW_BIN=${hvigorw_bin}" >> "${GITHUB_ENV}"
-          fi
-          if [[ -n "${hvigor_bin}" ]]; then
-            echo "HVIGOR_BIN=${hvigor_bin}" >> "${GITHUB_ENV}"
-          fi
-          if [[ -x "${HOME}/harmonyOS-command-line-tools/bin/init.sh" ]]; then
-            bash "${HOME}/harmonyOS-command-line-tools/bin/init.sh" || true
-          fi
-          if [[ -x "${HOME}/harmonyOS-command-line-tools/ohpm/bin/init.sh" ]]; then
-            bash "${HOME}/harmonyOS-command-line-tools/ohpm/bin/init.sh" || true
-          fi
-          if [[ -x "${HOME}/harmonyOS-command-line-tools/ohpm/bin/init" ]]; then
-            "${HOME}/harmonyOS-command-line-tools/ohpm/bin/init" || true
-          fi
-
-      - name: Build HAR in temporary Harmony shell project
-        if: ${{ inputs.force_rebuild_har || hashFiles('dist/harmony_log.har') == '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/ci/build-temp-har.sh "${{ steps.version.outputs.version_name }}"
-
-      - name: Use prebuilt HAR from repository
-        if: ${{ !inputs.force_rebuild_har && hashFiles('dist/harmony_log.har') != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "HAR_FILE_PATH=${GITHUB_WORKSPACE}/dist/harmony_log.har" >> "${GITHUB_ENV}"
-
-      - name: Configure OHPM publish credentials
-        if: ${{ !inputs.dry_run }}
-        shell: bash
-        env:
-          OHPM_PRIVATE_KEY_PEM: ${{ secrets.OHPM_PRIVATE_KEY_PEM }}
-          OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
-          OHPM_AUTH_TOKEN: ${{ secrets.OHPM_AUTH_TOKEN }}
-          OHPM_KEY_PASSPHRASE_ENCRYPTED: ${{ secrets.OHPM_KEY_PASSPHRASE_ENCRYPTED }}
-          RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${OHPM_PUBLISH_ID}" ]]; then
-            echo "OHPM_PUBLISH_ID is required for publish." >&2
-            exit 1
-          fi
-          mkdir -p "${HOME}/.ohpm"
-          if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" && -f "${HOME}/.ohpm/keys/ohpm_rsa_20260401" ]]; then
-            key_path="${HOME}/.ohpm/keys/ohpm_rsa_20260401"
-          else
-            if [[ -z "${OHPM_PRIVATE_KEY_PEM}" ]]; then
-              echo "OHPM_PRIVATE_KEY_PEM is required for publish." >&2
-              exit 1
-            fi
-            key_path="${HOME}/.ohpm/publish_key.pem"
-            printf '%s\n' "${OHPM_PRIVATE_KEY_PEM}" > "${key_path}"
-          fi
-          chmod 600 "${key_path}"
-          echo "OHPM_KEY_PATH=${key_path}" >> "${GITHUB_ENV}"
-          ohpm config set key_path "${key_path}"
-          ohpm config set publish_id "${OHPM_PUBLISH_ID}"
-          ohpm config set registry "${OHPM_REGISTRY}"
-          ohpm config set publish_registry "${OHPM_REGISTRY}"
-          ohpm config set log_level "warn"
-          if [[ -n "${OHPM_KEY_PASSPHRASE_ENCRYPTED:-}" ]]; then
-            crypto_path="${HOME}/.ohpm/crypto-ci"
-            if [[ ! -d "${crypto_path}" ]]; then
-              echo "Missing crypto component at ${crypto_path}" >&2
-              exit 1
-            fi
-            ohpm config set crypto_path "${crypto_path}"
-            ohpm config set key_passphrase "${OHPM_KEY_PASSPHRASE_ENCRYPTED}"
-          fi
-          if [[ -n "${OHPM_AUTH_TOKEN:-}" ]]; then
-            ohpm config set "//ohpm.openharmony.cn/ohpm/:_auth" "${OHPM_AUTH_TOKEN}"
-          fi
-
-      - name: Publish HAR to OHPM
-        if: ${{ !inputs.dry_run }}
-        shell: bash
-        env:
-          OHPM_KEY_PASSPHRASE: ${{ secrets.OHPM_KEY_PASSPHRASE }}
-          RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: |
-          set -euo pipefail
-          har_file="${HAR_FILE_PATH:-}"
-          if [[ -z "${har_file}" || ! -f "${har_file}" ]]; then
-            echo "HAR_FILE_PATH is missing or invalid." >&2
-            exit 1
-          fi
-          bash scripts/ci/ensure-har-license.sh "${har_file}" "${GITHUB_WORKSPACE}/LICENSE"
-          publish_har="${har_file}"
-          canonical_har_name="$(python3 scripts/ci/har-canonical-name.py "${har_file}")"
-          if [[ -n "${canonical_har_name}" ]]; then
-            canonical_har_path="$(dirname "${har_file}")/${canonical_har_name}"
-            if [[ "$(basename "${har_file}")" != "${canonical_har_name}" ]]; then
-              cp -f "${har_file}" "${canonical_har_path}"
-              publish_har="${canonical_har_path}"
-            fi
-          fi
-          publish_log="$(mktemp)"
-          ohpm_status=0
-          publish_cmd="ohpm publish \"${publish_har}\" --publish_registry \"${OHPM_REGISTRY}\""
-          run_publish_with_tty() {
-            local cmd="$1"
-            if script -V >/dev/null 2>&1 || script --version >/dev/null 2>&1; then
-              script -q -e -c "${cmd}" /dev/null
-            else
-              script -q /dev/null bash -lc "${cmd}"
-            fi
-          }
-          if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
-            set +e
-            bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
-            ohpm_status=${PIPESTATUS[0]}
-            set -e
-          elif [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
-            # ohpm publish may ask for source-leak warning confirmation before passphrase.
-            set +e
-            printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
-            ohpm_status=${PIPESTATUS[1]}
-            set -e
-          else
-            set +e
-            printf 'y\n' | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
-            ohpm_status=${PIPESTATUS[1]}
-            set -e
-          fi
-          if [[ "${ohpm_status}" -ne 0 ]]; then
-            exit "${ohpm_status}"
-          fi
-          clean_log="$(mktemp)"
-          sed -E 's/\x1B\[[0-9;?]*[ -/]*[@-~]//g' "${publish_log}" > "${clean_log}"
-          if grep -Eq 'ohpm ERROR| ERROR:' "${clean_log}"; then
-            echo "Detected ohpm error output in publish log." >&2
-            exit 1
-          fi
+  publish:
+    needs: resolve-version
+    uses: NeptuneKit/.github/.github/workflows/ohpm-publish.yml@main
+    with:
+      version: ${{ needs.resolve-version.outputs.version_name }}
+      dry_run: ${{ inputs.dry_run }}
+      build_command: bash scripts/ci/build-temp-har.sh "${{ needs.resolve-version.outputs.version_name }}"
+      har_glob: ${{ format('{0}/harmony-log-ohpm-publish/library/build/**/*.har', runner.temp) }}
+      license_path: LICENSE
+      readme_path: README.md
+      changelog_path: CHANGELOG.md
+      publish_registry: https://ohpm.openharmony.cn/ohpm/
+    secrets: inherit
