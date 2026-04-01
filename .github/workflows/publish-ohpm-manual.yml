@@ -149,8 +149,23 @@ jobs:
           har_dir="$(dirname "${har_file}")"
           har_name="$(basename "${har_file}")"
           cd "${har_dir}"
+          publish_log="$(mktemp)"
+          ohpm_status=0
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
-            printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}"
+            set +e
+            printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}" 2>&1 | tee "${publish_log}"
+            ohpm_status=${PIPESTATUS[1]}
+            set -e
           else
-            ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}"
+            set +e
+            ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}" 2>&1 | tee "${publish_log}"
+            ohpm_status=${PIPESTATUS[0]}
+            set -e
+          fi
+          if [[ "${ohpm_status}" -ne 0 ]]; then
+            exit "${ohpm_status}"
+          fi
+          if grep -Eq 'ohpm ERROR| ERROR:' "${publish_log}"; then
+            echo "Detected ohpm error output in publish log." >&2
+            exit 1
           fi
