@@ -8,17 +8,85 @@ export enum HarmonyLogLevel {
   CRITICAL = 60
 }
 
-export type HarmonyLogMetadataScalar = string | number | boolean | null;
-export type HarmonyLogMetadataValue =
-  | HarmonyLogMetadataScalar
-  | HarmonyLogMetadataValue[]
-  | { [key: string]: HarmonyLogMetadataValue }
-  | undefined;
-export type HarmonyLogMetadata = Record<string, HarmonyLogMetadataValue>;
-export type HarmonyLogMessage = string | (() => string);
-export type HarmonyLogMetadataInput = HarmonyLogMetadata | (() => HarmonyLogMetadata | undefined);
+export type HarmonyLogMetadataValue = string | number | boolean | null;
 
-export interface HarmonyLogRecord {
+export class HarmonyLogMetadata {
+  private values: Map<string, HarmonyLogMetadataValue> = new Map();
+
+  set(key: string, value: HarmonyLogMetadataValue): void {
+    this.values.set(key, value);
+  }
+
+  remove(key: string): void {
+    this.values.delete(key);
+  }
+
+  get(key: string): HarmonyLogMetadataValue | undefined {
+    return this.values.get(key);
+  }
+
+  isEmpty(): boolean {
+    return this.values.size === 0;
+  }
+
+  keys(): Array<string> {
+    return Array.from(this.values.keys());
+  }
+
+  clone(): HarmonyLogMetadata {
+    const next = new HarmonyLogMetadata();
+    const allKeys = this.keys();
+    for (let i = 0; i < allKeys.length; i += 1) {
+      const key = allKeys[i];
+      const value = this.values.get(key);
+      if (value !== undefined) {
+        next.set(key, value);
+      }
+    }
+    return next;
+  }
+
+  mergeFrom(other?: HarmonyLogMetadata): void {
+    if (!other) {
+      return;
+    }
+    const allKeys = other.keys();
+    for (let i = 0; i < allKeys.length; i += 1) {
+      const key = allKeys[i];
+      const value = other.get(key);
+      if (value !== undefined) {
+        this.values.set(key, value);
+      }
+    }
+  }
+
+  toText(): string {
+    const allKeys = this.keys();
+    if (allKeys.length === 0) {
+      return '';
+    }
+    allKeys.sort((left, right) => left.localeCompare(right));
+    const parts: Array<string> = [];
+    for (let i = 0; i < allKeys.length; i += 1) {
+      const key = allKeys[i];
+      const value = this.values.get(key);
+      parts.push(key + '=' + HarmonyLogMetadata.valueToText(value));
+    }
+    return parts.join(',');
+  }
+
+  static valueToText(value: HarmonyLogMetadataValue | undefined): string {
+    if (value === undefined) {
+      return 'undefined';
+    }
+    if (value === null) {
+      return 'null';
+    }
+    return String(value);
+  }
+}
+
+export class HarmonyLogRecord {
   timestamp: number;
   label: string;
   level: HarmonyLogLevel;
@@ -26,8 +94,34 @@ export interface HarmonyLogRecord {
   metadata?: HarmonyLogMetadata;
   source?: string;
   file?: string;
-  function?: string;
+  functionName?: string;
   line?: number;
+
+  constructor(
+    timestamp: number,
+    label: string,
+    level: HarmonyLogLevel,
+    message: string,
+    metadata?: HarmonyLogMetadata,
+    source?: string,
+    file?: string,
+    functionName?: string,
+    line?: number
+  ) {
+    this.timestamp = timestamp;
+    this.label = label;
+    this.level = level;
+    this.message = message;
+    this.metadata = metadata;
+    this.source = source;
+    this.file = file;
+    this.functionName = functionName;
+    this.line = line;
+  }
+}
+
+export interface HarmonyLogMetadataProvider {
+  get(): HarmonyLogMetadata;
 }
 
 export interface HarmonyLogHandler {
@@ -36,102 +130,101 @@ export interface HarmonyLogHandler {
   metadataProvider?: HarmonyLogMetadataProvider;
 }
 
-export interface HarmonyLogMetadataProvider {
-  get(): HarmonyLogMetadata;
-}
-
-export type HarmonyLogStreamTarget = 'stdout' | 'stderr';
-
 export class MultiplexLogHandler implements HarmonyLogHandler {
-  private handlers: HarmonyLogHandler[];
-  private _minimumLevel: HarmonyLogLevel;
+  private handlers: Array<HarmonyLogHandler>;
+  private levelValue: HarmonyLogLevel;
 
-  constructor(handlers: HarmonyLogHandler[]) {
+  constructor(handlers: Array<HarmonyLogHandler>) {
     if (handlers.length === 0) {
       throw new Error('MultiplexLogHandler.handlers MUST NOT be empty');
     }
-    this.handlers = [...handlers];
-    this._minimumLevel = this.handlers.reduce(
-      (minLevel, handler) => (handler.minimumLevel < minLevel ? handler.minimumLevel : minLevel),
-      this.handlers[0].minimumLevel
-    );
+    this.handlers = handlers;
+    this.levelValue = handlers[0].minimumLevel;
+    for (let i = 1; i < handlers.length; i += 1) {
+      if (handlers[i].minimumLevel < this.levelValue) {
+        this.levelValue = handlers[i].minimumLevel;
+      }
+    }
   }
 
   get minimumLevel(): HarmonyLogLevel {
-    return this._minimumLevel;
+    return this.levelValue;
   }
 
   set minimumLevel(value: HarmonyLogLevel) {
-    this._minimumLevel = value;
-    this.handlers.forEach(handler => {
-      handler.minimumLevel = value;
-    });
+    this.levelValue = value;
+    for (let i = 0; i < this.handlers.length; i += 1) {
+      this.handlers[i].minimumLevel = value;
+    }
   }
 
   log(record: HarmonyLogRecord): void {
-    this.handlers.forEach(handler => {
+    for (let i = 0; i < this.handlers.length; i += 1) {
+      const handler = this.handlers[i];
       if (record.level >= handler.minimumLevel) {
         handler.log(record);
       }
-    });
+    }
   }
 }
 
 export class HarmonyLogNoOpHandler implements HarmonyLogHandler {
-  private _minimumLevel: HarmonyLogLevel = HarmonyLogLevel.CRITICAL;
+  private levelValue: HarmonyLogLevel = HarmonyLogLevel.CRITICAL;
 
   get minimumLevel(): HarmonyLogLevel {
-    return this._minimumLevel;
+    return this.levelValue;
   }
 
   set minimumLevel(_: HarmonyLogLevel) {
-    // Keep no-op behavior stable.
+    // no-op
   }
 
   log(_: HarmonyLogRecord): void {
-    // Intentionally no-op.
+    // no-op
   }
 }
 
-export interface InMemoryLogEntry {
+export class InMemoryLogEntry {
   level: HarmonyLogLevel;
   message: string;
   metadata: HarmonyLogMetadata;
+
+  constructor(level: HarmonyLogLevel, message: string, metadata: HarmonyLogMetadata) {
+    this.level = level;
+    this.message = message;
+    this.metadata = metadata;
+  }
 }
 
 export class InMemoryLogHandler implements HarmonyLogHandler {
   minimumLevel: HarmonyLogLevel = HarmonyLogLevel.INFO;
   metadataProvider?: HarmonyLogMetadataProvider;
-  private metadata: HarmonyLogMetadata = {};
-  private entries: InMemoryLogEntry[] = [];
+
+  private metadataValue: HarmonyLogMetadata = new HarmonyLogMetadata();
+  private entries: Array<InMemoryLogEntry> = [];
 
   log(record: HarmonyLogRecord): void {
     if (record.level < this.minimumLevel) {
       return;
     }
-    const withProvider = Logger.mergeMetadata(this.metadata, this.metadataProvider?.get());
-    const merged = Logger.mergeMetadata(withProvider, record.metadata);
-    this.entries.push({
-      level: record.level,
-      message: record.message,
-      metadata: merged
-    });
+    const merged = this.metadataValue.clone();
+    if (this.metadataProvider) {
+      merged.mergeFrom(this.metadataProvider.get());
+    }
+    merged.mergeFrom(record.metadata);
+    this.entries.push(new InMemoryLogEntry(record.level, record.message, merged));
   }
 
-  setMetadata(key: string, value: HarmonyLogMetadataValue): void {
+  setMetadata(key: string, value?: HarmonyLogMetadataValue): void {
     if (value === undefined) {
-      delete this.metadata[key];
+      this.metadataValue.remove(key);
       return;
     }
-    this.metadata[key] = value;
+    this.metadataValue.set(key, value);
   }
 
-  getMetadata(): HarmonyLogMetadata {
-    return { ...this.metadata };
-  }
-
-  getEntries(): InMemoryLogEntry[] {
-    return this.entries.map(entry => ({ ...entry, metadata: { ...entry.metadata } }));
+  getEntries(): Array<InMemoryLogEntry> {
+    return this.entries.slice();
   }
 
   clear(): void {
@@ -144,59 +237,58 @@ export class StreamLogHandler implements HarmonyLogHandler {
   metadataProvider?: HarmonyLogMetadataProvider;
 
   private label: string;
-  private target: HarmonyLogStreamTarget;
-  private metadata: HarmonyLogMetadata = {};
+  private toError: boolean;
+  private metadataValue: HarmonyLogMetadata = new HarmonyLogMetadata();
 
-  constructor(label: string, target: HarmonyLogStreamTarget, metadataProvider?: HarmonyLogMetadataProvider) {
+  constructor(label: string, toError: boolean, metadataProvider?: HarmonyLogMetadataProvider) {
     this.label = label;
-    this.target = target;
+    this.toError = toError;
     this.metadataProvider = metadataProvider;
   }
 
   static standardOutput(label: string, metadataProvider?: HarmonyLogMetadataProvider): StreamLogHandler {
-    return new StreamLogHandler(label, 'stdout', metadataProvider);
+    return new StreamLogHandler(label, false, metadataProvider);
   }
 
   static standardError(label: string, metadataProvider?: HarmonyLogMetadataProvider): StreamLogHandler {
-    return new StreamLogHandler(label, 'stderr', metadataProvider);
+    return new StreamLogHandler(label, true, metadataProvider);
   }
 
-  setMetadata(key: string, value: HarmonyLogMetadataValue): void {
+  setMetadata(key: string, value?: HarmonyLogMetadataValue): void {
     if (value === undefined) {
-      delete this.metadata[key];
+      this.metadataValue.remove(key);
       return;
     }
-    this.metadata[key] = value;
-  }
-
-  getMetadata(): HarmonyLogMetadata {
-    return { ...this.metadata };
+    this.metadataValue.set(key, value);
   }
 
   log(record: HarmonyLogRecord): void {
     if (record.level < this.minimumLevel) {
       return;
     }
-    const withProvider = Logger.mergeMetadata(this.metadata, this.metadataProvider?.get());
-    const merged = Logger.mergeMetadata(withProvider, record.metadata);
-    const output = StreamLogHandler.formatLine(this.label, record, merged);
-    if (this.target === 'stderr') {
-      console.error(output);
-      return;
+    const merged = this.metadataValue.clone();
+    if (this.metadataProvider) {
+      merged.mergeFrom(this.metadataProvider.get());
     }
-    console.info(output);
-  }
-
-  private static formatLine(label: string, record: HarmonyLogRecord, metadata: HarmonyLogMetadata): string {
-    const ts = new Date(record.timestamp).toISOString();
-    const levelText = Logger.levelText(record.level);
-    const metadataText = Logger.metadataToText(metadata);
-    const sourceText = record.source ?? 'n/a';
-    const labelText = label.length > 0 ? label : record.label;
-    if (metadataText.length > 0) {
-      return `${ts} ${levelText} ${labelText}: ${metadataText} [${sourceText}] ${record.message}`;
+    merged.mergeFrom(record.metadata);
+    const sourceText = record.source ? record.source : 'n/a';
+    const line =
+      new Date(record.timestamp).toISOString() +
+      ' ' +
+      Logger.levelText(record.level) +
+      ' ' +
+      this.label +
+      ': ' +
+      (merged.isEmpty() ? '' : merged.toText() + ' ') +
+      '[' +
+      sourceText +
+      '] ' +
+      record.message;
+    if (this.toError) {
+      console.error(line);
+    } else {
+      console.info(line);
     }
-    return `${ts} ${levelText} ${labelText}: [${sourceText}] ${record.message}`;
   }
 }
 
@@ -214,7 +306,7 @@ export class LoggingSystem {
       throw new Error('logging system can only be initialized once per process.');
     }
     LoggerSystem.factory = factory;
-    LoggerSystem.metadataProvider = metadataProvider ?? null;
+    LoggerSystem.metadataProvider = metadataProvider ? metadataProvider : null;
     LoggerSystem.bootstrapped = true;
   }
 
@@ -223,37 +315,31 @@ export class LoggingSystem {
     LoggerSystem.metadataProvider = null;
     LoggerSystem.bootstrapped = false;
   }
-
-  static isBootstrapped(): boolean {
-    return LoggerSystem.bootstrapped;
-  }
-
-  static getMetadataProvider(): HarmonyLogMetadataProvider | null {
-    return LoggerSystem.metadataProvider;
-  }
 }
 
 export class MDCStore {
-  private values: HarmonyLogMetadata = {};
+  private values: HarmonyLogMetadata = new HarmonyLogMetadata();
 
-  get metadata(): HarmonyLogMetadata {
-    return { ...this.values };
+  getMetadata(): HarmonyLogMetadata {
+    return this.values.clone();
   }
 
-  get(key: string): HarmonyLogMetadataValue {
-    return this.values[key];
-  }
-
-  set(key: string, value: HarmonyLogMetadataValue): void {
+  set(key: string, value?: HarmonyLogMetadataValue): void {
     if (value === undefined) {
-      delete this.values[key];
+      this.values.remove(key);
       return;
     }
-    this.values[key] = value;
+    this.values.set(key, value);
   }
 
   clear(): void {
-    this.values = {};
+    this.values = new HarmonyLogMetadata();
+  }
+}
+
+class MDCProvider implements HarmonyLogMetadataProvider {
+  get(): HarmonyLogMetadata {
+    return MDC.global.getMetadata();
   }
 }
 
@@ -261,32 +347,34 @@ export class MDC {
   static global: MDCStore = new MDCStore();
 
   static metadataProvider(): HarmonyLogMetadataProvider {
-    return {
-      get: () => MDC.global.metadata
-    };
+    return new MDCProvider();
   }
 }
 
 export class Logger {
   static globalLevel: HarmonyLogLevel = HarmonyLogLevel.INFO;
   static compileTimeMinimumLevel: HarmonyLogLevel = HarmonyLogLevel.TRACE;
-  private static globalHandlers: HarmonyLogHandler[] = [];
+  private static globalHandlers: Array<HarmonyLogHandler> = [];
 
   label: string;
-  metadata: HarmonyLogMetadata = {};
+  metadata: HarmonyLogMetadata = new HarmonyLogMetadata();
   level: HarmonyLogLevel = Logger.globalLevel;
-  handlers: HarmonyLogHandler[] | null = null;
+  handlers: Array<HarmonyLogHandler> | null = null;
   metadataProvider: HarmonyLogMetadataProvider | null = null;
 
   constructor(label: string, metadataProvider?: HarmonyLogMetadataProvider | null) {
     this.label = label;
-    this.metadataProvider = metadataProvider ?? LoggerSystem.metadataProvider;
-    if (LoggerSystem.factory !== null) {
+    this.metadataProvider = metadataProvider ? metadataProvider : LoggerSystem.metadataProvider;
+    if (LoggerSystem.factory) {
       this.handlers = [LoggerSystem.factory(label)];
     }
   }
 
-  static setGlobalHandlers(handlers: HarmonyLogHandler[]): void {
+  static setCompileTimeMinimumLevel(level: HarmonyLogLevel): void {
+    Logger.compileTimeMinimumLevel = level;
+  }
+
+  static setGlobalHandlers(handlers: Array<HarmonyLogHandler>): void {
     Logger.globalHandlers = handlers;
   }
 
@@ -295,27 +383,15 @@ export class Logger {
   }
 
   static logger(label: string, metadataProvider?: HarmonyLogMetadataProvider): Logger {
-    return new Logger(label, metadataProvider);
-  }
-
-  static setCompileTimeMinimumLevel(level: HarmonyLogLevel): void {
-    Logger.compileTimeMinimumLevel = level;
+    return new Logger(label, metadataProvider ? metadataProvider : null);
   }
 
   static safeTag(label: string): string {
     const sanitized = label.replace(/[^a-zA-Z0-9_.-]/g, '_');
-    return sanitized.length > 31 ? sanitized.substring(0, 31) : sanitized;
-  }
-
-  static formatRecord(record: HarmonyLogRecord): string {
-    const ts = new Date(record.timestamp).toISOString();
-    const level = Logger.levelText(record.level);
-    const metadataText = Logger.metadataToText(record.metadata);
-    const callsite = Logger.callsiteToText(record);
-    if (metadataText.length > 0) {
-      return `[${ts}] [${level}] [${record.label}]${callsite} ${record.message} | ${metadataText}`;
+    if (sanitized.length > 31) {
+      return sanitized.substring(0, 31);
     }
-    return `[${ts}] [${level}] [${record.label}]${callsite} ${record.message}`;
+    return sanitized;
   }
 
   static levelText(level: HarmonyLogLevel): string {
@@ -339,162 +415,93 @@ export class Logger {
     }
   }
 
-  static metadataToText(metadata?: HarmonyLogMetadata): string {
-    if (!metadata) {
-      return '';
-    }
-    const entries = Object.entries(metadata).sort(([left], [right]) => left.localeCompare(right));
-    if (entries.length === 0) {
-      return '';
-    }
-    return entries
-      .map(([key, value]) => `${key}=${Logger.metadataValueToText(value)}`)
-      .join(',');
-  }
+  static formatRecord(record: HarmonyLogRecord): string {
+    const ts = new Date(record.timestamp).toISOString();
+    const level = Logger.levelText(record.level);
+    const metadataText = record.metadata ? record.metadata.toText() : '';
+    const sourcePart = record.source ? 'source=' + record.source : '';
+    const filePart = record.file ? 'file=' + record.file : '';
+    const functionPart = record.functionName ? 'func=' + record.functionName : '';
+    const linePart = record.line !== undefined ? 'line=' + String(record.line) : '';
 
-  private static metadataValueToText(value: HarmonyLogMetadataValue): string {
-    if (value === undefined) {
-      return 'undefined';
+    const callsiteItems: Array<string> = [];
+    if (sourcePart.length > 0) {
+      callsiteItems.push(sourcePart);
     }
-    if (value === null) {
-      return 'null';
+    if (filePart.length > 0) {
+      callsiteItems.push(filePart);
     }
-    if (Array.isArray(value)) {
-      return `[${value.map(item => Logger.metadataValueToText(item)).join(',')}]`;
+    if (functionPart.length > 0) {
+      callsiteItems.push(functionPart);
     }
-    if (typeof value === 'object') {
-      const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right));
-      return `{${entries.map(([key, entryValue]) => `${key}:${Logger.metadataValueToText(entryValue)}`).join(',')}}`;
+    if (linePart.length > 0) {
+      callsiteItems.push(linePart);
     }
-    return String(value);
-  }
 
-  private static callsiteToText(record: HarmonyLogRecord): string {
-    const sourcePart = record.source ? `source=${record.source}` : '';
-    const filePart = record.file ? `file=${record.file}` : '';
-    const functionPart = record.function ? `func=${record.function}` : '';
-    const linePart = record.line !== undefined ? `line=${record.line}` : '';
-    const items = [sourcePart, filePart, functionPart, linePart].filter(item => item.length > 0);
-    if (items.length === 0) {
-      return '';
+    const callsiteText = callsiteItems.length > 0 ? ' [' + callsiteItems.join(' ') + ']' : '';
+    if (metadataText.length > 0) {
+      return '[' + ts + '] [' + level + '] [' + record.label + ']' + callsiteText + ' ' + record.message + ' | ' + metadataText;
     }
-    return ` [${items.join(' ')}]`;
+    return '[' + ts + '] [' + level + '] [' + record.label + ']' + callsiteText + ' ' + record.message;
   }
 
   withMetadata(metadata: HarmonyLogMetadata): Logger {
-    const next = new Logger(this.label);
+    const next = new Logger(this.label, this.metadataProvider);
     next.level = this.level;
     next.handlers = this.handlers;
-    next.metadataProvider = this.metadataProvider;
-    next.metadata = Logger.mergeMetadata(this.metadata, metadata);
+    next.metadata = this.metadata.clone();
+    next.metadata.mergeFrom(metadata);
     return next;
   }
 
   copy(): Logger {
     const next = new Logger(this.label, this.metadataProvider);
     next.level = this.level;
-    next.handlers = this.handlers ? [...this.handlers] : null;
-    next.metadata = { ...this.metadata };
-    return next;
-  }
-
-  withMetadataProvider(metadataProvider: HarmonyLogMetadataProvider | null): Logger {
-    const next = new Logger(this.label, metadataProvider);
-    next.level = this.level;
     next.handlers = this.handlers;
-    next.metadata = { ...this.metadata };
+    next.metadata = this.metadata.clone();
     return next;
   }
 
-  setMetadata(key: string, value: HarmonyLogMetadataValue): void {
+  setMetadata(key: string, value?: HarmonyLogMetadataValue): void {
     if (value === undefined) {
-      delete this.metadata[key];
+      this.metadata.remove(key);
       return;
     }
-    this.metadata[key] = value;
+    this.metadata.set(key, value);
   }
 
-  trace(
-    message: HarmonyLogMessage,
-    metadata?: HarmonyLogMetadataInput,
-    source?: string,
-    file?: string,
-    func?: string,
-    line?: number
-  ): void {
+  trace(message: string, metadata?: HarmonyLogMetadata, source?: string, file?: string, func?: string, line?: number): void {
     this.log(HarmonyLogLevel.TRACE, message, metadata, source, file, func, line);
   }
 
-  debug(
-    message: HarmonyLogMessage,
-    metadata?: HarmonyLogMetadataInput,
-    source?: string,
-    file?: string,
-    func?: string,
-    line?: number
-  ): void {
+  debug(message: string, metadata?: HarmonyLogMetadata, source?: string, file?: string, func?: string, line?: number): void {
     this.log(HarmonyLogLevel.DEBUG, message, metadata, source, file, func, line);
   }
 
-  info(
-    message: HarmonyLogMessage,
-    metadata?: HarmonyLogMetadataInput,
-    source?: string,
-    file?: string,
-    func?: string,
-    line?: number
-  ): void {
+  info(message: string, metadata?: HarmonyLogMetadata, source?: string, file?: string, func?: string, line?: number): void {
     this.log(HarmonyLogLevel.INFO, message, metadata, source, file, func, line);
   }
 
-  notice(
-    message: HarmonyLogMessage,
-    metadata?: HarmonyLogMetadataInput,
-    source?: string,
-    file?: string,
-    func?: string,
-    line?: number
-  ): void {
+  notice(message: string, metadata?: HarmonyLogMetadata, source?: string, file?: string, func?: string, line?: number): void {
     this.log(HarmonyLogLevel.NOTICE, message, metadata, source, file, func, line);
   }
 
-  warning(
-    message: HarmonyLogMessage,
-    metadata?: HarmonyLogMetadataInput,
-    source?: string,
-    file?: string,
-    func?: string,
-    line?: number
-  ): void {
+  warning(message: string, metadata?: HarmonyLogMetadata, source?: string, file?: string, func?: string, line?: number): void {
     this.log(HarmonyLogLevel.WARNING, message, metadata, source, file, func, line);
   }
 
-  error(
-    message: HarmonyLogMessage,
-    metadata?: HarmonyLogMetadataInput,
-    source?: string,
-    file?: string,
-    func?: string,
-    line?: number
-  ): void {
+  error(message: string, metadata?: HarmonyLogMetadata, source?: string, file?: string, func?: string, line?: number): void {
     this.log(HarmonyLogLevel.ERROR, message, metadata, source, file, func, line);
   }
 
-  critical(
-    message: HarmonyLogMessage,
-    metadata?: HarmonyLogMetadataInput,
-    source?: string,
-    file?: string,
-    func?: string,
-    line?: number
-  ): void {
+  critical(message: string, metadata?: HarmonyLogMetadata, source?: string, file?: string, func?: string, line?: number): void {
     this.log(HarmonyLogLevel.CRITICAL, message, metadata, source, file, func, line);
   }
 
   log(
     level: HarmonyLogLevel,
-    message: HarmonyLogMessage,
-    metadata?: HarmonyLogMetadataInput,
+    message: string,
+    metadata?: HarmonyLogMetadata,
     source?: string,
     file?: string,
     func?: string,
@@ -506,70 +513,46 @@ export class Logger {
     if (level < this.level) {
       return;
     }
-    const resolvedMessage = Logger.materializeMessage(message);
-    const resolvedSource = source ?? Logger.currentModule(file);
-    const resolvedMetadataInput = Logger.materializeMetadata(metadata);
-    const fromProvider = this.metadataProvider?.get() ?? undefined;
-    const mergedWithProvider = Logger.mergeMetadata(this.metadata, fromProvider);
-    const resolvedMetadata = Logger.mergeMetadata(mergedWithProvider, resolvedMetadataInput);
-    const record: HarmonyLogRecord = {
-      timestamp: Date.now(),
-      label: this.label,
-      level: level,
-      message: resolvedMessage,
-      metadata: Object.keys(resolvedMetadata).length === 0 ? undefined : resolvedMetadata,
-      source: resolvedSource,
-      file,
-      function: func,
-      line
-    };
 
-    const resolvedHandlers = this.handlers ?? Logger.globalHandlers;
-    resolvedHandlers.forEach((handler: HarmonyLogHandler) => {
+    const providerMetadata = this.metadataProvider ? this.metadataProvider.get() : undefined;
+    const merged = this.metadata.clone();
+    merged.mergeFrom(providerMetadata);
+    merged.mergeFrom(metadata);
+
+    const actualSource = source ? source : Logger.currentModule(file);
+    const record = new HarmonyLogRecord(
+      Date.now(),
+      this.label,
+      level,
+      message,
+      merged.isEmpty() ? undefined : merged,
+      actualSource,
+      file,
+      func,
+      line
+    );
+
+    const resolvedHandlers = this.handlers ? this.handlers : Logger.globalHandlers;
+    for (let i = 0; i < resolvedHandlers.length; i += 1) {
+      const handler = resolvedHandlers[i];
       if (level >= handler.minimumLevel) {
         handler.log(record);
       }
-    });
-  }
-
-  static mergeMetadata(base: HarmonyLogMetadata, explicit?: HarmonyLogMetadata): HarmonyLogMetadata {
-    const merged: HarmonyLogMetadata = { ...base };
-    if (!explicit) {
-      return merged;
     }
-    for (const [key, value] of Object.entries(explicit)) {
-      if (value === undefined) {
-        delete merged[key];
-        continue;
-      }
-      merged[key] = value;
-    }
-    return merged;
-  }
-
-  private static materializeMessage(message: HarmonyLogMessage): string {
-    return typeof message === 'function' ? message() : message;
-  }
-
-  private static materializeMetadata(metadata?: HarmonyLogMetadataInput): HarmonyLogMetadata | undefined {
-    if (metadata === undefined) {
-      return undefined;
-    }
-    return typeof metadata === 'function' ? metadata() : metadata;
   }
 
   private static currentModule(file?: string): string {
     if (!file || file.length === 0) {
       return 'n/a';
     }
-    const slash = file.lastIndexOf('/');
-    if (slash <= 0) {
+    const lastSlash = file.lastIndexOf('/');
+    if (lastSlash <= 0) {
       return 'n/a';
     }
-    const previous = file.lastIndexOf('/', slash - 1);
-    if (previous < 0) {
-      return file.substring(0, slash);
+    const before = file.lastIndexOf('/', lastSlash - 1);
+    if (before < 0) {
+      return file.substring(0, lastSlash);
     }
-    return file.substring(previous + 1, slash);
+    return file.substring(before + 1, lastSlash);
   }
 }
