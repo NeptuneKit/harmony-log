@@ -68,8 +68,19 @@ jobs:
           echo "${HOME}/harmonyOS-command-line-tools/hvigor/bin" >> "${GITHUB_PATH}"
           echo "${HOME}/harmonyOS-command-line-tools/node_modules/.bin" >> "${GITHUB_PATH}"
           export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Duser.country=CN"
+          chmod +x "${HOME}/harmonyOS-command-line-tools/bin/hvigorw" 2>/dev/null || true
+          chmod +x "${HOME}/harmonyOS-command-line-tools/hvigor/bin/hvigorw" 2>/dev/null || true
+          chmod +x "${HOME}/harmonyOS-command-line-tools/hvigor/bin/hvigor" 2>/dev/null || true
           chmod +x "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr"
           "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr" install toolchains:9 OpenHarmony/toolchains:9 --accept-license
+          hvigorw_bin="$(find "${HOME}/harmonyOS-command-line-tools" -type f -name hvigorw | head -n1 || true)"
+          hvigor_bin="$(find "${HOME}/harmonyOS-command-line-tools" -type f -name hvigor | head -n1 || true)"
+          if [[ -n "${hvigorw_bin}" ]]; then
+            echo "HVIGORW_BIN=${hvigorw_bin}" >> "${GITHUB_ENV}"
+          fi
+          if [[ -n "${hvigor_bin}" ]]; then
+            echo "HVIGOR_BIN=${hvigor_bin}" >> "${GITHUB_ENV}"
+          fi
           if [[ -x "${HOME}/harmonyOS-command-line-tools/bin/init.sh" ]]; then
             bash "${HOME}/harmonyOS-command-line-tools/bin/init.sh" || true
           fi
