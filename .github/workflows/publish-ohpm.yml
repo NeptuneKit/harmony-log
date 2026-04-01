@@ -307,6 +307,7 @@ CFG
         shell: bash
         env:
           OHPM_KEY_PASSPHRASE: ${{ secrets.OHPM_KEY_PASSPHRASE }}
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           set -euo pipefail
 
@@ -326,7 +327,11 @@ CFG
               fi
             }
             if command -v script >/dev/null 2>&1; then
-              printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "ohpm publish \"${har_file}\" --publish_registry \"${OHPM_REGISTRY}\""
+              if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+                printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_file}" --publish_registry "${OHPM_REGISTRY}"
+              else
+                printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "ohpm publish \"${har_file}\" --publish_registry \"${OHPM_REGISTRY}\""
+              fi
             else
               printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_file}" --publish_registry "${OHPM_REGISTRY}"
             fi

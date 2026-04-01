@@ -181,6 +181,7 @@ jobs:
         shell: bash
         env:
           OHPM_KEY_PASSPHRASE: ${{ secrets.OHPM_KEY_PASSPHRASE }}
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           set -euo pipefail
           har_file="${HAR_FILE_PATH:-}"
@@ -212,12 +213,20 @@ jobs:
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
-            printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
+            if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+              printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
+            else
+              printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
+            fi
             ohpm_status=${PIPESTATUS[1]}
             set -e
           else
             set +e
-            printf 'y\n' | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
+            if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+              printf 'y\n' | bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
+            else
+              printf 'y\n' | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
+            fi
             ohpm_status=${PIPESTATUS[1]}
             set -e
           fi
