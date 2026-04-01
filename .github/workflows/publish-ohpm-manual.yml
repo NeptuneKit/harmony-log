@@ -170,15 +170,23 @@ jobs:
           publish_log="$(mktemp)"
           ohpm_status=0
           publish_cmd="NODE_OPTIONS=--trace-uncaught ohpm publish \"${publish_har}\" --publish_registry \"${OHPM_REGISTRY}\""
+          run_publish_with_tty() {
+            local cmd="$1"
+            if script -V >/dev/null 2>&1 || script --version >/dev/null 2>&1; then
+              script -q -e -c "${cmd}" /dev/null
+            else
+              script -q /dev/null bash -lc "${cmd}"
+            fi
+          }
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
-            printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | script -q -e -c "${publish_cmd}" /dev/null 2>&1 | tee "${publish_log}"
+            printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
             ohpm_status=${PIPESTATUS[1]}
             set -e
           else
             set +e
-            printf 'y\n' | script -q -e -c "${publish_cmd}" /dev/null 2>&1 | tee "${publish_log}"
+            printf 'y\n' | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
             ohpm_status=${PIPESTATUS[1]}
             set -e
           fi

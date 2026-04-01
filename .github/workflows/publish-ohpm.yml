@@ -286,8 +286,16 @@ CFG
           fi
 
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
+            run_publish_with_tty() {
+              local cmd="$1"
+              if script -V >/dev/null 2>&1 || script --version >/dev/null 2>&1; then
+                script -q -e -c "${cmd}" /dev/null
+              else
+                script -q /dev/null bash -lc "${cmd}"
+              fi
+            }
             if command -v script >/dev/null 2>&1; then
-              printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | script -q -e -c "ohpm publish \"${har_file}\" --publish_registry \"${OHPM_REGISTRY}\"" /dev/null
+              printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "ohpm publish \"${har_file}\" --publish_registry \"${OHPM_REGISTRY}\""
             else
               printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_file}" --publish_registry "${OHPM_REGISTRY}"
             fi
