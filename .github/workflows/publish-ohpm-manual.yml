@@ -134,6 +134,7 @@ jobs:
           ohpm config set key_path "${key_path}"
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
+          ohpm config set log_level "debug"
           if [[ -n "${OHPM_TOKEN:-}" ]]; then
             printf '\n//ohpm.openharmony.cn/ohpm/:_auth=%s\n' "${OHPM_TOKEN}" >> "${HOME}/.ohpm/.ohpmrc"
           fi
