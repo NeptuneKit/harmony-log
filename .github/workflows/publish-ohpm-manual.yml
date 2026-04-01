@@ -145,8 +145,11 @@ jobs:
             echo "HAR_FILE_PATH is missing or invalid." >&2
             exit 1
           fi
+          har_dir="$(dirname "${har_file}")"
+          har_name="$(basename "${har_file}")"
+          cd "${har_dir}"
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
-            printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_file}" --publish_registry "${OHPM_REGISTRY}"
+            printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}"
           else
-            ohpm publish "${har_file}" --publish_registry "${OHPM_REGISTRY}"
+            ohpm publish "${har_name}" --publish_registry "${OHPM_REGISTRY}"
           fi
