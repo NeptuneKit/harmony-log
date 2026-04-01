@@ -277,6 +277,7 @@ CFG
           OHPM_PRIVATE_KEY_PEM: ${{ secrets.OHPM_PRIVATE_KEY_PEM }}
           OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
           OHPM_AUTH_TOKEN: ${{ secrets.OHPM_AUTH_TOKEN }}
+          OHPM_KEY_PASSPHRASE_ENCRYPTED: ${{ secrets.OHPM_KEY_PASSPHRASE_ENCRYPTED }}
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           set -euo pipefail
@@ -303,6 +304,16 @@ CFG
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
           ohpm config set publish_registry "${OHPM_REGISTRY}"
+          ohpm config set log_level "warn"
+          if [[ -n "${OHPM_KEY_PASSPHRASE_ENCRYPTED:-}" ]]; then
+            crypto_path="${HOME}/.ohpm/crypto-ci"
+            if [[ ! -d "${crypto_path}" ]]; then
+              echo "Missing crypto component at ${crypto_path}" >&2
+              exit 1
+            fi
+            ohpm config set crypto_path "${crypto_path}"
+            ohpm config set key_passphrase "${OHPM_KEY_PASSPHRASE_ENCRYPTED}"
+          fi
           if [[ -n "${OHPM_AUTH_TOKEN:-}" ]]; then
             ohpm config set "//ohpm.openharmony.cn/ohpm/:_auth" "${OHPM_AUTH_TOKEN}"
           fi
@@ -322,7 +333,9 @@ CFG
             exit 1
           fi
 
-          if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
+          if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+            ohpm publish "${har_file}" --publish_registry "${OHPM_REGISTRY}"
+          elif [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             run_publish_with_tty() {
               local cmd="$1"
               if script -V >/dev/null 2>&1 || script --version >/dev/null 2>&1; then
@@ -332,11 +345,7 @@ CFG
               fi
             }
             if command -v script >/dev/null 2>&1; then
-              if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
-                printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_file}" --publish_registry "${OHPM_REGISTRY}"
-              else
-                printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "ohpm publish \"${har_file}\" --publish_registry \"${OHPM_REGISTRY}\""
-              fi
+              printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "ohpm publish \"${har_file}\" --publish_registry \"${OHPM_REGISTRY}\""
             else
               printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | ohpm publish "${har_file}" --publish_registry "${OHPM_REGISTRY}"
             fi

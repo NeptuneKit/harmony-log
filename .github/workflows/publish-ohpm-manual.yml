@@ -152,6 +152,7 @@ jobs:
           OHPM_PRIVATE_KEY_PEM: ${{ secrets.OHPM_PRIVATE_KEY_PEM }}
           OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
           OHPM_AUTH_TOKEN: ${{ secrets.OHPM_AUTH_TOKEN }}
+          OHPM_KEY_PASSPHRASE_ENCRYPTED: ${{ secrets.OHPM_KEY_PASSPHRASE_ENCRYPTED }}
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           set -euo pipefail
@@ -176,7 +177,16 @@ jobs:
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
           ohpm config set publish_registry "${OHPM_REGISTRY}"
-          ohpm config set log_level "debug"
+          ohpm config set log_level "warn"
+          if [[ -n "${OHPM_KEY_PASSPHRASE_ENCRYPTED:-}" ]]; then
+            crypto_path="${HOME}/.ohpm/crypto-ci"
+            if [[ ! -d "${crypto_path}" ]]; then
+              echo "Missing crypto component at ${crypto_path}" >&2
+              exit 1
+            fi
+            ohpm config set crypto_path "${crypto_path}"
+            ohpm config set key_passphrase "${OHPM_KEY_PASSPHRASE_ENCRYPTED}"
+          fi
           if [[ -n "${OHPM_AUTH_TOKEN:-}" ]]; then
             ohpm config set "//ohpm.openharmony.cn/ohpm/:_auth" "${OHPM_AUTH_TOKEN}"
           fi
@@ -206,7 +216,7 @@ jobs:
           fi
           publish_log="$(mktemp)"
           ohpm_status=0
-          publish_cmd="NODE_OPTIONS=--trace-uncaught ohpm publish \"${publish_har}\" --publish_registry \"${OHPM_REGISTRY}\""
+          publish_cmd="ohpm publish \"${publish_har}\" --publish_registry \"${OHPM_REGISTRY}\""
           run_publish_with_tty() {
             local cmd="$1"
             if script -V >/dev/null 2>&1 || script --version >/dev/null 2>&1; then
@@ -215,23 +225,20 @@ jobs:
               script -q /dev/null bash -lc "${cmd}"
             fi
           }
-          if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
+          if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+            set +e
+            bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
+            ohpm_status=${PIPESTATUS[0]}
+            set -e
+          elif [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
-            if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
-              printf '%s\n' "${OHPM_KEY_PASSPHRASE}" | bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
-            else
-              printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
-            fi
+            printf 'y\n%s\n' "${OHPM_KEY_PASSPHRASE}" | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
             ohpm_status=${PIPESTATUS[1]}
             set -e
           else
             set +e
-            if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
-              printf '\n' | bash -lc "${publish_cmd}" 2>&1 | tee "${publish_log}"
-            else
-              printf 'y\n' | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
-            fi
+            printf 'y\n' | run_publish_with_tty "${publish_cmd}" 2>&1 | tee "${publish_log}"
             ohpm_status=${PIPESTATUS[1]}
             set -e
           fi
