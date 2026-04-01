@@ -134,6 +134,14 @@ CFG
 cd "${tmp_proj}"
 ohpm install
 
+# Ensure no stale hvigor daemon is reusing an invalid previous SDK environment.
+if command -v hvigorw >/dev/null 2>&1; then
+  hvigorw --stop-daemon >/dev/null 2>&1 || true
+fi
+if command -v hvigor >/dev/null 2>&1; then
+  hvigor --stop-daemon >/dev/null 2>&1 || true
+fi
+
 discovered_bin=""
 discovered_node_script=""
 fixed_candidates=(

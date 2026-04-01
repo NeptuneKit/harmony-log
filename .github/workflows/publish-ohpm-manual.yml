@@ -58,11 +58,14 @@ jobs:
           chmod +x "${toolkit_root}/bin/hvigorw" 2>/dev/null || true
           chmod +x "${toolkit_root}/hvigor/bin/hvigorw" 2>/dev/null || true
           echo "JAVA_HOME=${HOME}/Java/temurin-17.jdk/Contents/Home" >> "${GITHUB_ENV}"
+          echo "DEVECO_SDK_HOME=${toolkit_root}/sdk" >> "${GITHUB_ENV}"
+          echo "HOS_SDK_HOME=${toolkit_root}/sdk/default/openharmony" >> "${GITHUB_ENV}"
           echo "${HOME}/Java/temurin-17.jdk/Contents/Home/bin" >> "${GITHUB_PATH}"
           echo "${toolkit_root}/bin" >> "${GITHUB_PATH}"
           echo "${toolkit_root}/tool/node/bin" >> "${GITHUB_PATH}"
           echo "${toolkit_root}/hvigor/bin" >> "${GITHUB_PATH}"
           echo "${toolkit_root}/node_modules/.bin" >> "${GITHUB_PATH}"
+          echo "${toolkit_root}/sdk/default/openharmony/toolchains" >> "${GITHUB_PATH}"
 
       - name: Set up Java 17
         if: ${{ runner.environment != 'self-hosted' }}
