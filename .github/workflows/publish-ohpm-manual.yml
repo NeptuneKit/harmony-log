@@ -46,8 +46,11 @@ jobs:
     with:
       version: ${{ needs.resolve-version.outputs.version_name }}
       dry_run: ${{ inputs.dry_run }}
-      build_command: bash scripts/ci/build-temp-har.sh "${{ needs.resolve-version.outputs.version_name }}"
-      har_glob: ${{ format('{0}/harmony-log-ohpm-publish/library/build/**/*.har', runner.temp) }}
+      build_command: |
+        HAR_PATH="$(bash scripts/ci/build-temp-har.sh "${{ needs.resolve-version.outputs.version_name }}")"
+        mkdir -p dist
+        cp -f "${HAR_PATH}" dist/harmony_log.har
+      har_path: dist/harmony_log.har
       license_path: LICENSE
       readme_path: README.md
       changelog_path: CHANGELOG.md
