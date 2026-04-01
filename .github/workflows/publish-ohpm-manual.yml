@@ -151,18 +151,9 @@ jobs:
             echo "HAR_FILE_PATH is missing or invalid." >&2
             exit 1
           fi
-          publish_har="${har_file}"
-          canonical_har_name="$(python3 scripts/ci/har-canonical-name.py "${har_file}")"
-          if [[ -n "${canonical_har_name}" ]]; then
-            canonical_har_path="$(dirname "${har_file}")/${canonical_har_name}"
-            if [[ "$(basename "${har_file}")" != "${canonical_har_name}" ]]; then
-              cp -f "${har_file}" "${canonical_har_path}"
-              publish_har="${canonical_har_path}"
-            fi
-          fi
           publish_log="$(mktemp)"
           ohpm_status=0
-          publish_cmd="NODE_OPTIONS=--trace-uncaught ohpm publish \"${publish_har}\" --publish_registry \"${OHPM_REGISTRY}\""
+          publish_cmd="NODE_OPTIONS=--trace-uncaught ohpm publish --publish_registry \"${OHPM_REGISTRY}\""
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
