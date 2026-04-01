@@ -8,7 +8,7 @@ fi
 
 har_path="$1"
 license_path="$2"
-repo_root="$(cd "$(dirname "${har_path}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${license_path}")" && pwd)"
 readme_src="${repo_root}/README.md"
 changelog_src="${repo_root}/CHANGELOG.md"
 
