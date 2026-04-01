@@ -1,15 +1,18 @@
 name: Publish To OHPM
 
 on:
+  push:
+    tags:
+      - "*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Package version (e.g. 1.0.0)"
-        required: true
-        default: "1.0.0"
+        description: "Package version (e.g. 1.0.0). Leave empty to use tag name."
+        required: false
+        default: ""
         type: string
       dry_run:
-        description: "Build only, skip publish"
+        description: "Build only, skip ohpm publish"
         required: false
         default: false
         type: boolean
@@ -17,14 +20,40 @@ on:
 permissions:
   contents: read
 
-env:
-  OHPM_REGISTRY: https://ohpm.openharmony.cn/ohpm/
-
 jobs:
   publish:
     runs-on: ubuntu-latest
 
+    env:
+      OHPM_REGISTRY: https://ohpm.openharmony.cn/ohpm/
+
     steps:
+      - name: Resolve package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version_input="${{ inputs.version }}"
+          version_name="${version_input}"
+
+          if [[ -z "${version_name}" ]]; then
+            if [[ "${GITHUB_REF_TYPE:-}" != "tag" ]]; then
+              echo "workflow_dispatch from branch requires inputs.version" >&2
+              exit 1
+            fi
+            version_name="${GITHUB_REF_NAME}"
+          fi
+
+          version_name="${version_name#v}"
+
+          if [[ ! "${version_name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]]; then
+            echo "invalid version: ${version_name}" >&2
+            exit 1
+          fi
+
+          printf 'version_name=%s\n' "${version_name}" >> "${GITHUB_OUTPUT}"
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -60,8 +89,8 @@ jobs:
           echo "${HOME}/harmonyOS-command-line-tools/hvigor/bin" >> "${GITHUB_PATH}"
           echo "${HOME}/harmonyOS-command-line-tools/node_modules/.bin" >> "${GITHUB_PATH}"
 
-          chmod +x "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr"
           export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Duser.country=CN"
+          chmod +x "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr"
           "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr" install toolchains:9 OpenHarmony/toolchains:9 --accept-license
 
       - name: Build HAR in temporary Harmony shell project
@@ -69,11 +98,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          TMP_PROJ="${RUNNER_TEMP}/harmony-log-ohpm-publish"
-          rm -rf "${TMP_PROJ}"
-          mkdir -p "${TMP_PROJ}/hvigor" "${TMP_PROJ}/library/src/main/ets" "${TMP_PROJ}/library/src/main" "${TMP_PROJ}/AppScope"
+          version_name="${{ steps.version.outputs.version_name }}"
+          tmp_proj="${RUNNER_TEMP}/harmony-log-ohpm-publish"
+          rm -rf "${tmp_proj}"
+          mkdir -p "${tmp_proj}/hvigor" "${tmp_proj}/library/src/main/ets" "${tmp_proj}/library/src/main" "${tmp_proj}/AppScope"
 
-          cat > "${TMP_PROJ}/oh-package.json5" <<'JSON'
+          cat > "${tmp_proj}/oh-package.json5" <<'JSON'
           {
             "modelVersion": "5.0.0",
             "description": "Project shell for building harmony-log HAR module.",
@@ -82,7 +112,7 @@ jobs:
           }
 JSON
 
-          cat > "${TMP_PROJ}/hvigor/hvigor-config.json5" <<'JSON'
+          cat > "${tmp_proj}/hvigor/hvigor-config.json5" <<'JSON'
           {
             "modelVersion": "5.0.0",
             "dependencies": {},
@@ -93,7 +123,7 @@ JSON
           }
 JSON
 
-          cat > "${TMP_PROJ}/hvigorfile.ts" <<'TS'
+          cat > "${tmp_proj}/hvigorfile.ts" <<'TS'
           import { appTasks } from '@ohos/hvigor-ohos-plugin'
 
           export default {
@@ -102,7 +132,7 @@ JSON
           }
 TS
 
-          cat > "${TMP_PROJ}/build-profile.json5" <<'JSON'
+          cat > "${tmp_proj}/build-profile.json5" <<'JSON'
           {
             "app": {
               "products": [
@@ -133,18 +163,18 @@ TS
           }
 JSON
 
-          cat > "${TMP_PROJ}/AppScope/app.json5" <<'JSON'
+          cat > "${tmp_proj}/AppScope/app.json5" <<JSON
           {
             "app": {
               "bundleName": "io.github.neptunekit.harmony.log",
               "vendor": "NeptuneKit",
               "versionCode": 1,
-              "versionName": "${{ inputs.version }}"
+              "versionName": "${version_name}"
             }
           }
 JSON
 
-          cat > "${TMP_PROJ}/library/hvigorfile.ts" <<'TS'
+          cat > "${tmp_proj}/library/hvigorfile.ts" <<'TS'
           import { harTasks } from '@ohos/hvigor-ohos-plugin'
 
           export default {
@@ -153,7 +183,7 @@ JSON
           }
 TS
 
-          cat > "${TMP_PROJ}/library/build-profile.json5" <<'JSON'
+          cat > "${tmp_proj}/library/build-profile.json5" <<'JSON'
           {
             "apiType": "stageMode",
             "targets": [
@@ -164,10 +194,10 @@ TS
           }
 JSON
 
-          cat > "${TMP_PROJ}/library/oh-package.json5" <<'JSON'
+          cat > "${tmp_proj}/library/oh-package.json5" <<JSON
           {
             "name": "harmony-log",
-            "version": "${{ inputs.version }}",
+            "version": "${version_name}",
             "description": "Swift-log style logger for HarmonyOS.",
             "main": "Index.ets",
             "author": "NeptuneKit",
@@ -179,31 +209,31 @@ JSON
           }
 JSON
 
-          cat > "${TMP_PROJ}/library/Index.ets" <<'TS'
+          cat > "${tmp_proj}/library/Index.ets" <<'TS'
           export * from './src/main/ets/HarmonyLog'
 TS
 
-          cp src/main/ets/HarmonyLog.ets "${TMP_PROJ}/library/src/main/ets/HarmonyLog.ets"
-          cp src/main/ets/HarmonyLogCore.ets "${TMP_PROJ}/library/src/main/ets/HarmonyLogCore.ets"
-          cp src/main/module.json5 "${TMP_PROJ}/library/src/main/module.json5"
+          cp src/main/ets/HarmonyLog.ets "${tmp_proj}/library/src/main/ets/HarmonyLog.ets"
+          cp src/main/ets/HarmonyLogCore.ets "${tmp_proj}/library/src/main/ets/HarmonyLogCore.ets"
+          cp src/main/module.json5 "${tmp_proj}/library/src/main/module.json5"
 
-          cat > "${TMP_PROJ}/.ohpmrc" <<'CFG'
+          cat > "${tmp_proj}/.ohpmrc" <<'CFG'
           registry=https://ohpm.openharmony.cn/ohpm/
           publish_registry=https://ohpm.openharmony.cn/ohpm/
           strict_ssl=true
 CFG
 
-          cd "${TMP_PROJ}"
+          cd "${tmp_proj}"
           ohpm install
           hvigorw --mode module -p module=harmony_log assembleHar --no-daemon
 
-          HAR_PATH="$(find "${TMP_PROJ}/library/build" -type f -name '*.har' | head -n 1)"
-          if [[ -z "${HAR_PATH}" || ! -f "${HAR_PATH}" ]]; then
-            echo "HAR build failed: no artifact found" >&2
+          har_path="$(find "${tmp_proj}/library/build" -type f -name '*.har' | head -n 1)"
+          if [[ -z "${har_path}" || ! -f "${har_path}" ]]; then
+            echo "No .har artifact found." >&2
             exit 1
           fi
 
-          echo "HAR_FILE_PATH=${HAR_PATH}" >> "${GITHUB_ENV}"
+          echo "HAR_FILE_PATH=${har_path}" >> "${GITHUB_ENV}"
 
       - name: Configure OHPM publish credentials
         if: ${{ !inputs.dry_run }}
