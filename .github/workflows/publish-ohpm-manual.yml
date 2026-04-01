@@ -115,6 +115,7 @@ jobs:
         env:
           OHPM_PRIVATE_KEY_PEM: ${{ secrets.OHPM_PRIVATE_KEY_PEM }}
           OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
+          OHPM_TOKEN: ${{ secrets.OHPM_TOKEN }}
         run: |
           set -euo pipefail
           if [[ -z "${OHPM_PRIVATE_KEY_PEM}" ]]; then
@@ -133,6 +134,9 @@ jobs:
           ohpm config set key_path "${key_path}"
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
+          if [[ -n "${OHPM_TOKEN:-}" ]]; then
+            ohpm config set //ohpm.openharmony.cn/ohpm/:_auth "${OHPM_TOKEN}"
+          fi
 
       - name: Publish HAR to OHPM
         if: ${{ !inputs.dry_run }}
