@@ -270,6 +270,7 @@ CFG
           ohpm config set key_path "${key_path}"
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
+          ohpm config set publish_registry "${OHPM_REGISTRY}"
 
       - name: Publish HAR to OHPM
         if: ${{ !inputs.dry_run }}

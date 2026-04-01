@@ -143,6 +143,7 @@ jobs:
           ohpm config set key_path "${key_path}"
           ohpm config set publish_id "${OHPM_PUBLISH_ID}"
           ohpm config set registry "${OHPM_REGISTRY}"
+          ohpm config set publish_registry "${OHPM_REGISTRY}"
           ohpm config set log_level "debug"
 
       - name: Publish HAR to OHPM
