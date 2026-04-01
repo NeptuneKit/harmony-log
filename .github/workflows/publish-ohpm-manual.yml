@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   publish:
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64]
     env:
       OHPM_REGISTRY: https://ohpm.openharmony.cn/ohpm/
 
