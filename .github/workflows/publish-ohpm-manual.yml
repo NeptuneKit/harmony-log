@@ -150,12 +150,9 @@ jobs:
             echo "HAR_FILE_PATH is missing or invalid." >&2
             exit 1
           fi
-          har_dir="$(dirname "${har_file}")"
-          har_name="$(basename "${har_file}")"
-          cd "${har_dir}"
           publish_log="$(mktemp)"
           ohpm_status=0
-          publish_cmd="ohpm publish \"${har_name}\" --publish_registry \"${OHPM_REGISTRY}\""
+          publish_cmd="ohpm publish \"${har_file}\" --publish_registry \"${OHPM_REGISTRY}\""
           if [[ -n "${OHPM_KEY_PASSPHRASE:-}" ]]; then
             # ohpm publish may ask for source-leak warning confirmation before passphrase.
             set +e
