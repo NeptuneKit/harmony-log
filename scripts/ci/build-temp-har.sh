@@ -16,7 +16,10 @@ cat > "${tmp_proj}/oh-package.json5" <<'JSON'
   "modelVersion": "5.0.0",
   "description": "Project shell for building harmony-log HAR module.",
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "@ohos/hvigor": "^5.0.0",
+    "@ohos/hvigor-ohos-plugin": "^5.0.0"
+  }
 }
 JSON
 
