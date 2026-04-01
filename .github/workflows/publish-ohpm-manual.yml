@@ -70,6 +70,15 @@ jobs:
           export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Duser.country=CN"
           chmod +x "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr"
           "${HOME}/harmonyOS-command-line-tools/sdkmanager/bin/sdkmgr" install toolchains:9 OpenHarmony/toolchains:9 --accept-license
+          if [[ -x "${HOME}/harmonyOS-command-line-tools/bin/init.sh" ]]; then
+            bash "${HOME}/harmonyOS-command-line-tools/bin/init.sh" || true
+          fi
+          if [[ -x "${HOME}/harmonyOS-command-line-tools/ohpm/bin/init.sh" ]]; then
+            bash "${HOME}/harmonyOS-command-line-tools/ohpm/bin/init.sh" || true
+          fi
+          if [[ -x "${HOME}/harmonyOS-command-line-tools/ohpm/bin/init" ]]; then
+            "${HOME}/harmonyOS-command-line-tools/ohpm/bin/init" || true
+          fi
 
       - name: Build HAR in temporary Harmony shell project
         shell: bash
