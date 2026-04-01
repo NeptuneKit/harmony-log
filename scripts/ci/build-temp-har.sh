@@ -136,15 +136,30 @@ ohpm install
 
 discovered_bin=""
 discovered_node_script=""
+fixed_candidates=(
+  "${HOME}/harmonyOS-command-line-tools/bin/hvigorw"
+  "${HOME}/harmonyOS-command-line-tools/bin/hvigor"
+  "${HOME}/harmonyOS-command-line-tools/hvigor/bin/hvigorw"
+  "${HOME}/harmonyOS-command-line-tools/hvigor/bin/hvigor"
+  "${HOME}/harmonyOS-command-line-tools/node_modules/.bin/hvigorw"
+  "${HOME}/harmonyOS-command-line-tools/node_modules/.bin/hvigor"
+)
+
+for candidate in "${fixed_candidates[@]}"; do
+  if [[ -x "${candidate}" ]]; then
+    discovered_bin="${candidate}"
+    break
+  fi
+done
+
 while IFS= read -r candidate; do
   if [[ "${candidate}" == *"/hvigor.js" && -f "${candidate}" ]]; then
     discovered_node_script="${candidate}"
   fi
-  if [[ -f "${candidate}" && -x "${candidate}" ]]; then
+  if [[ -z "${discovered_bin}" && -f "${candidate}" && -x "${candidate}" ]]; then
     discovered_bin="${candidate}"
-    break
   fi
-done < <(find "${HOME}" "${tmp_proj}" -maxdepth 10 \( -name "hvigor" -o -name "hvigorw" -o -name "hvigor.js" \) 2>/dev/null | sort -u)
+done < <(find "${HOME}" "${tmp_proj}" -maxdepth 14 -type f \( -name "hvigor" -o -name "hvigorw" -o -name "hvigor.js" \) 2>/dev/null | sort -u)
 
 if command -v hvigorw >/dev/null 2>&1; then
   "$(command -v hvigorw)" --mode module -p module=harmony_log assembleHar --no-daemon
