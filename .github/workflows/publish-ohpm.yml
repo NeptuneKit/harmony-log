@@ -57,18 +57,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare self-hosted toolchain
+        if: ${{ runner.environment == 'self-hosted' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          toolkit_root="${HOME}/harmonyOS-command-line-tools"
+          if [[ ! -d "${toolkit_root}" ]]; then
+            echo "Missing toolkit at ${toolkit_root}" >&2
+            exit 1
+          fi
+          chmod +x "${toolkit_root}/bin/ohpm" 2>/dev/null || true
+          chmod +x "${toolkit_root}/bin/hvigorw" 2>/dev/null || true
+          chmod +x "${toolkit_root}/hvigor/bin/hvigorw" 2>/dev/null || true
+          echo "JAVA_HOME=${HOME}/Java/temurin-17.jdk/Contents/Home" >> "${GITHUB_ENV}"
+          echo "${HOME}/Java/temurin-17.jdk/Contents/Home/bin" >> "${GITHUB_PATH}"
+          echo "${toolkit_root}/bin" >> "${GITHUB_PATH}"
+          echo "${toolkit_root}/tool/node/bin" >> "${GITHUB_PATH}"
+          echo "${toolkit_root}/hvigor/bin" >> "${GITHUB_PATH}"
+          echo "${toolkit_root}/node_modules/.bin" >> "${GITHUB_PATH}"
+
       - name: Set up Java 17
+        if: ${{ runner.environment != 'self-hosted' }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Node.js
+        if: ${{ runner.environment != 'self-hosted' }}
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install Harmony command line tools
+        if: ${{ runner.environment != 'self-hosted' }}
         shell: bash
         run: |
           set -euo pipefail
