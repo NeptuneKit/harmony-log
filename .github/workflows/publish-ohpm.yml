@@ -1,6 +1,6 @@
 name: Publish To OHPM
 
-on:
+'on':
   push:
     tags:
       - "*"

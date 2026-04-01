@@ -1,6 +1,6 @@
 name: Publish To OHPM (Manual)
 
-on:
+'on':
   workflow_dispatch:
     inputs:
       version:
