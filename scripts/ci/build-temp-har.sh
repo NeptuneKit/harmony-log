@@ -133,7 +133,32 @@ CFG
 
 cd "${tmp_proj}"
 ohpm install
-hvigorw --mode module -p module=harmony_log assembleHar --no-daemon
+
+discovered_bin=""
+discovered_node_script=""
+while IFS= read -r candidate; do
+  if [[ "${candidate}" == *"/hvigor.js" && -f "${candidate}" ]]; then
+    discovered_node_script="${candidate}"
+  fi
+  if [[ -f "${candidate}" && -x "${candidate}" ]]; then
+    discovered_bin="${candidate}"
+    break
+  fi
+done < <(find "${HOME}" "${tmp_proj}" -maxdepth 10 \( -name "hvigor" -o -name "hvigorw" -o -name "hvigor.js" \) 2>/dev/null | sort -u)
+
+if command -v hvigorw >/dev/null 2>&1; then
+  "$(command -v hvigorw)" --mode module -p module=harmony_log assembleHar --no-daemon
+elif command -v hvigor >/dev/null 2>&1; then
+  "$(command -v hvigor)" --mode module -p module=harmony_log assembleHar --no-daemon
+elif [[ -n "${discovered_bin}" ]]; then
+  "${discovered_bin}" --mode module -p module=harmony_log assembleHar --no-daemon
+elif [[ -n "${discovered_node_script}" ]]; then
+  node "${discovered_node_script}" --mode module -p module=harmony_log assembleHar --no-daemon
+else
+  echo "Cannot find hvigor executable for build." >&2
+  find "${HOME}" "${tmp_proj}" -maxdepth 10 \( -name "hvigor" -o -name "hvigorw" -o -name "hvigor.js" \) -print >&2 2>/dev/null || true
+  exit 1
+fi
 
 har_path="$(find "${tmp_proj}/library/build" -type f -name '*.har' | head -n 1)"
 if [[ -z "${har_path}" || ! -f "${har_path}" ]]; then
