@@ -12,6 +12,9 @@ on:
         required: false
         default: false
         type: boolean
+  repository_dispatch:
+    types:
+      - publish-ohpm
 
 permissions:
   contents: read
@@ -30,7 +33,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          version_name="${{ inputs.version }}"
+          version_input="${{ inputs.version || github.event.client_payload.version || '' }}"
+          dry_run_input="${{ inputs.dry_run || github.event.client_payload.dry_run || false }}"
+          if [[ "${dry_run_input}" == "true" ]]; then
+            echo "DRY_RUN=true" >> "${GITHUB_ENV}"
+          else
+            echo "DRY_RUN=false" >> "${GITHUB_ENV}"
+          fi
+
+          version_name="${version_input}"
           version_name="${version_name#v}"
 
           if [[ ! "${version_name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]] && [[ ! "${version_name}" =~ ^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]+)?$ ]]; then
@@ -222,7 +233,7 @@ CFG
           echo "HAR_FILE_PATH=${har_path}" >> "${GITHUB_ENV}"
 
       - name: Configure OHPM publish credentials
-        if: ${{ !inputs.dry_run }}
+        if: ${{ env.DRY_RUN != 'true' }}
         shell: bash
         env:
           OHPM_PRIVATE_KEY_PEM: ${{ secrets.OHPM_PRIVATE_KEY_PEM }}
@@ -249,7 +260,7 @@ CFG
           ohpm config set registry "${OHPM_REGISTRY}"
 
       - name: Publish HAR to OHPM
-        if: ${{ !inputs.dry_run }}
+        if: ${{ env.DRY_RUN != 'true' }}
         shell: bash
         env:
           OHPM_KEY_PASSPHRASE: ${{ secrets.OHPM_KEY_PASSPHRASE }}
