@@ -4,7 +4,7 @@
   "description": "Swift-log style logger for HarmonyOS.",
   "main": "Index.ets",
   "author": "",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "dependencies": {},
   "devDependencies": {},
   "dynamicDependencies": {}

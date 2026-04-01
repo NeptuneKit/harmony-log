@@ -244,3 +244,7 @@ node --test tests/harmony-log-core.test.mjs
 - multiplex/no-op/stream/in-memory 行为
 - 惰性求值与级别裁剪
 - source 推断与 copy 语义
+
+## License
+
+MIT License. See [LICENSE](./LICENSE).
