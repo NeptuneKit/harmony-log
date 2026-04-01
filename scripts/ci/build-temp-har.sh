@@ -104,7 +104,7 @@ JSON
 
 cat > "${tmp_proj}/library/oh-package.json5" <<JSON
 {
-  "name": "harmony-log",
+  "name": "neptunekit-harmony-log",
   "version": "${version_name}",
   "description": "Swift-log style logger for HarmonyOS.",
   "main": "Index.ets",
