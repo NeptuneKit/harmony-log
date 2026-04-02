@@ -1,5 +1,5 @@
 ---
-name: harmony-log-usage
+name: harmony-log
 description: 使用 harmony-log（HarmonyOS 日志库）的安装、初始化、结构化日志、MDC 上下文和多 Handler 组合实践。用户提到“harmony-log 怎么用”“如何接入日志库”“如何初始化 LoggingSystem”“如何添加 metadata/MDC”“如何组合 Console/HiLog/Stream/InMemory handler”时使用。
 ---
 

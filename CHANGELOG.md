@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.12 - 2026-04-02
+
+- Rename skill from `harmony-log-usage` to `harmony-log` to match expected naming.
+- Move skill source to `skills/harmony-log/`.
+- Replace packaged skill artifact with `dist/harmony-log.skill`.
+
 ## 1.0.11 - 2026-04-02
 
 - Add distributable skill package `harmony-log-usage` to guide users on installing and using harmony-log.
