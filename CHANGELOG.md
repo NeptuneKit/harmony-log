@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.10 - 2026-04-02
+
+- README: add repository URL and issue tracker URL for easier project discovery.
+
 ## 1.0.9 - 2026-04-02
 
 - Fix release creation step to use GitHub API (`actions/github-script`) instead of local `gh` CLI on runner.

@@ -10,6 +10,11 @@
 - 标准后端：`Console`、`HiLog`、`Stream`、`InMemory`、`NoOp`
 - 惰性消息与日志级别裁剪
 
+## 仓库地址
+
+- GitHub: https://github.com/NeptuneKit/harmony-log
+- Issues: https://github.com/NeptuneKit/harmony-log/issues
+
 ## 安装
 
 通过 ohpm 安装：
