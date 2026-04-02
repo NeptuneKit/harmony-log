@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.8 - 2026-04-02
+
+- Fix auto-tag workflow to push tags with `RELEASE_BOT_TOKEN` (PAT), ensuring tag push can trigger downstream publish workflow.
+- Add explicit guard for missing `RELEASE_BOT_TOKEN` to fail fast with actionable message.
+
 ## 1.0.7 - 2026-04-02
 
 - CI: add `auto-tag-on-main` workflow to create a new semantic version tag for each commit on `main`.

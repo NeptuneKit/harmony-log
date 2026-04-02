@@ -12,10 +12,21 @@ jobs:
   auto-tag:
     runs-on: [self-hosted, macOS, ARM64]
     steps:
+      - name: Require PAT for tag push trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${{ secrets.RELEASE_BOT_TOKEN }}" ]]; then
+            echo "Missing required secret: RELEASE_BOT_TOKEN" >&2
+            echo "Use a PAT with repo + workflow scopes to push tags and trigger publish workflows." >&2
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
 
       - name: Create next semantic tag for current commit
         id: tag
@@ -48,9 +59,14 @@ jobs:
 
       - name: Push tag
         if: ${{ steps.tag.outputs.should_push == 'true' }}
+        env:
+          RELEASE_BOT_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           next_tag="${{ steps.tag.outputs.next_tag }}"
+          git config user.name "release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${RELEASE_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git tag -a "${next_tag}" -m "Auto release ${next_tag}" "${GITHUB_SHA}"
           git push origin "${next_tag}"
