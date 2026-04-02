@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7 - 2026-04-02
+
+- CI: add `auto-tag-on-main` workflow to create a new semantic version tag for each commit on `main`.
+- CI: keep tag-driven publish flow so each new tag triggers OHPM publish workflow.
+- CI: after successful tag publish, automatically create or update the corresponding GitHub Release.
+
 ## 1.0.6 - 2026-04-02
 
 - Policy update: package artifact is generated and committed for each repository change.

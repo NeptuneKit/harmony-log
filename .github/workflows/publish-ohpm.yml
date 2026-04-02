@@ -18,7 +18,7 @@ on:
         type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   resolve-version:
@@ -65,3 +65,49 @@ jobs:
       changelog_path: CHANGELOG.md
       publish_registry: https://ohpm.openharmony.cn/ohpm/
     secrets: inherit
+
+  create-release:
+    needs: [resolve-version, publish]
+    if: ${{ needs.publish.result == 'success' && github.ref_type == 'tag' }}
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build release notes from changelog
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_name="${{ needs.resolve-version.outputs.version_name }}"
+          tag_name="v${version_name}"
+          notes_file="$(mktemp)"
+          awk -v ver="## ${version_name} " '
+            BEGIN { in_section=0 }
+            $0 ~ "^## " && in_section==1 { exit }
+            index($0, ver)==1 { in_section=1; next }
+            in_section==1 { print }
+          ' CHANGELOG.md > "${notes_file}"
+
+          if [[ ! -s "${notes_file}" ]]; then
+            printf 'Release %s\n\nPublished by tag workflow.\n' "${tag_name}" > "${notes_file}"
+          fi
+
+          echo "tag_name=${tag_name}" >> "${GITHUB_OUTPUT}"
+          echo "notes_file=${notes_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_name="${{ steps.notes.outputs.tag_name }}"
+          notes_file="${{ steps.notes.outputs.notes_file }}"
+          if gh release view "${tag_name}" >/dev/null 2>&1; then
+            gh release edit "${tag_name}" --title "${tag_name}" --notes-file "${notes_file}"
+          else
+            gh release create "${tag_name}" --title "${tag_name}" --notes-file "${notes_file}" --verify-tag
+          fi
