@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.13 - 2026-04-02
+
+- CI: build `harmony-log.skill` in publish workflow and upload it as a GitHub Release asset.
+- Repo cleanup: remove tracked `dist/` directory and ignore it via `.gitignore`.
+
 ## 1.0.12 - 2026-04-02
 
 - Rename skill from `harmony-log-usage` to `harmony-log` to match expected naming.
