@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.9 - 2026-04-02
+
+- Fix release creation step to use GitHub API (`actions/github-script`) instead of local `gh` CLI on runner.
+- Ensure tag publish workflow can always create/update GitHub Release without runner-side gh dependency.
+
 ## 1.0.8 - 2026-04-02
 
 - Fix auto-tag workflow to push tags with `RELEASE_BOT_TOKEN` (PAT), ensuring tag push can trigger downstream publish workflow.

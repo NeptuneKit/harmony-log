@@ -99,15 +99,43 @@ jobs:
           echo "notes_file=${notes_file}" >> "${GITHUB_OUTPUT}"
 
       - name: Create or update GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag_name="${{ steps.notes.outputs.tag_name }}"
-          notes_file="${{ steps.notes.outputs.notes_file }}"
-          if gh release view "${tag_name}" >/dev/null 2>&1; then
-            gh release edit "${tag_name}" --title "${tag_name}" --notes-file "${notes_file}"
-          else
-            gh release create "${tag_name}" --title "${tag_name}" --notes-file "${notes_file}" --verify-tag
-          fi
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs')
+            const tag = `${{ steps.notes.outputs.tag_name }}`
+            const notesPath = `${{ steps.notes.outputs.notes_file }}`
+            const notes = fs.readFileSync(notesPath, 'utf8')
+            const { owner, repo } = context.repo
+
+            let existing = null
+            try {
+              const res = await github.rest.repos.getReleaseByTag({ owner, repo, tag })
+              existing = res.data
+            } catch (error) {
+              if (error.status !== 404) throw error
+            }
+
+            if (existing) {
+              await github.rest.repos.updateRelease({
+                owner,
+                repo,
+                release_id: existing.id,
+                tag_name: tag,
+                name: tag,
+                body: notes,
+                draft: false,
+                prerelease: false
+              })
+            } else {
+              await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tag,
+                name: tag,
+                body: notes,
+                draft: false,
+                prerelease: false
+              })
+            }
