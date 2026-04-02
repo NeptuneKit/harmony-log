@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.11 - 2026-04-02
+
+- Add distributable skill package `harmony-log-usage` to guide users on installing and using harmony-log.
+- Add skill source files under `skills/harmony-log-usage/`.
+- Add packaged artifact `dist/harmony-log-usage.skill`.
+
 ## 1.0.10 - 2026-04-02
 
 - README: add repository URL and issue tracker URL for easier project discovery.
