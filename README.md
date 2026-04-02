@@ -12,7 +12,15 @@
 
 ## 安装
 
-本库为 Harmony HAR 工程，直接作为依赖引入并从 `Index.ets` 导出使用：
+通过 ohpm 安装：
+
+```bash
+ohpm install harmony-log
+# 或
+ohpm i harmony-log
+```
+
+安装后从 `Index.ets` 导出使用：
 
 ```ts
 import { Logger, HarmonyLogLevel } from 'harmony-log';
